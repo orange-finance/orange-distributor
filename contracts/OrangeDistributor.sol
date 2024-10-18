@@ -39,10 +39,10 @@ contract OrangeDistributor is SYKPuller {
     error InvalidRewardAmount();
 
     // Mapping from vault to token to merkle root
-    mapping (address => mapping (address => MerkleRootData)) merkleRootData;
+    mapping (address => mapping (address => MerkleRootData)) public merkleRootData;
 
     // Mapping from vault to depositor to token to amount of token claimed
-    mapping (address => mapping (address => mapping (address => uint))) claimed;
+    mapping (address => mapping (address => mapping (address => uint))) public claimed;
 
     constructor() {}
 
