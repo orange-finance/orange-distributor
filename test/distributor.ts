@@ -133,4 +133,139 @@ describe("Gauge", function () {
       expect(s1BalanceAfter - s1BalanceBefore).to.equal(epoch1And2Reward)
     })
   })
+
+  describe("SYK distribution", () => {
+    let gauges: IGauge[]
+    before(async () => {
+      const ownableGauges = await Promise.all(gaugeAddresses.map(address => ethers.getContractAt("OwnableUpgradeable", address)))
+      await Promise.all(ownableGauges.map(async (gauge) => {
+        const ownerAddress = await gauge.owner()
+        await network.provider.request({
+          method: "hardhat_impersonateAccount",
+          params: [ownerAddress],
+        });
+        const owner = await ethers.getSigner(ownerAddress)
+        await gauge.connect(owner).transferOwnership(distributor.getAddress())
+      }))
+      for (const [i, vault] of vaultAddresses.entries()) {
+        await distributor.setGauge(vault, gaugeAddresses[i])
+      }
+
+      const modifiedGaugeFactory = await ethers.getContractFactory("GaugeType1")
+      const modifiedGauge = await modifiedGaugeFactory.deploy()
+      const code = await hre.network.provider.send("eth_getCode", [
+        await modifiedGauge.getAddress(),
+      ]);
+      for (const gauge of gaugeAddresses) {
+        await hre.network.provider.send("hardhat_setCode", [
+          gauge,
+          code,
+        ]);
+        const newGauge = await ethers.getContractAt("GaugeType1", gauge)
+        await newGauge.initialize(ethers.ZeroAddress, controllerAddress, await distributor.syk())
+        await newGauge.transferOwnership(distributor.getAddress())
+      }
+
+      // Whitelist distributor for xSYK
+      const xSYK = await ethers.getContractAt("IXStrykeToken", await distributor.xSyk())
+      const authorityAddress = "0xf885390B75035e94ac72AeF3E0D0eD5ec3b85d37"
+      await network.provider.request({
+        method: "hardhat_impersonateAccount",
+        params: [authorityAddress],
+      });
+      const authority = await ethers.getSigner(authorityAddress)
+      await network.provider.send("hardhat_setBalance", [
+        authorityAddress,
+        "0x10000000000000000000000000000000",
+      ]);
+      await xSYK.connect(authority).updateContractWhitelist(distributor.getAddress(), true)
+
+    })
+
+    it("Shows that an epoch reward can be pulled", async () => {
+      for (const vault of vaultAddresses) {
+        const canPull = await distributor.canPullNext(vault)
+        expect(canPull).to.be.true
+      }
+    })
+
+    it("Pulls rewards from gauge", async () => {
+      // const errorFactory = await ethers.getContractFactory("Errors")
+      // const errorsContract = await errorFactory.deploy()
+      // console.log(errorsContract.interface.getError("0xe4529edb"));
+      const syk: ERC20 = await ethers.getContractAt("ERC20", await distributor.syk())
+      for (const vault of vaultAddresses) {
+        const balanceBefore = await syk.balanceOf(distributor.getAddress())
+        await distributor.pullNext(vault)
+        const balanceAfter = await syk.balanceOf(distributor.getAddress())
+        expect(balanceAfter).to.greaterThan(balanceBefore)
+        expect(await distributor.canPullNext(vault)).to.be.false
+      }
+    })
+
+    it("Distributes syk and xSyk to users", async () => {
+      for (const vault of vaultAddresses) {
+        const epoch0Reward = await distributor.epochRewards(vault, 0)
+
+        const epochData = {
+          [s0.address]: {
+            user: s0.address,
+            rootId: 0,
+            proofs: [],
+            rewardAmount: epoch0Reward / 4n,
+            balance: 1n
+          },
+          [s1.address]: {
+            user: s1.address,
+            rootId: 0,
+            proofs: [],
+            rewardAmount: epoch0Reward / 4n,
+            balance: 1n
+          },
+          [s2.address]: {
+            user: s2.address,
+            rootId: 0,
+            proofs: [],
+            rewardAmount: epoch0Reward / 2n,
+            balance: 1n
+          }
+        }
+        const {merkleTree, proofs} = createRootAndProofs(epochData)
+    
+        await distributor.updateMerkleRoot(vault, await distributor.syk(), {root: merkleTree.getHexRoot(), distributionStartBlock: 0, distributionEndBlock: 999})
+    
+        await distributor.connect(s0).claim(vault, await distributor.syk(), epoch0Reward / 4n, proofs[s0.address])
+        await distributor.connect(s1).claim(vault, await distributor.syk(), epoch0Reward / 4n, proofs[s1.address])
+        await distributor.connect(s2).claim(vault, await distributor.syk(), epoch0Reward / 2n, proofs[s2.address])
+        const s0BalanceAfterSyk = await syk.balanceOf(s0.address)
+        const s0BalanceAfterxSyk = await xSyk.balanceOf(s0.address)
+        const s1BalanceAfterSyk = await syk.balanceOf(s1.address)
+        const s1BalanceAfterxSyk = await xSyk.balanceOf(s1.address)
+        const s2BalanceAfterSyk = await syk.balanceOf(s2.address)
+        const s2BalanceAfterxSyk = await xSyk.balanceOf(s2.address)
+
+        expect(s1BalanceAfterSyk).to.closeTo(s0BalanceAfterSyk, 1n)
+        expect(s2BalanceAfterSyk).to.closeTo(s0BalanceAfterSyk * 2n, 1n)
+        expect(s1BalanceAfterxSyk).to.closeTo(s0BalanceAfterxSyk, 1n)
+        expect(s2BalanceAfterxSyk).to.closeTo(s0BalanceAfterxSyk * 2n, 1n)
+      }
+      expect(await syk.balanceOf(distributor.getAddress())).to.lessThan(10n)
+    })
+
+    it("Skips pulling some epochs for syk", async () => {
+      for (const vault of vaultAddresses) {
+        await distributor.skipPulls(vault, 10)
+        expect(await distributor.nextStrykeEpochToPull(vault)).to.equal(10)
+      }
+    })
+  })
+
+  it("Rejects unauthorized transactions", async () => {
+    const attacker = (await ethers.getSigners())[5]
+    await expect(distributor.initialize(ethers.ZeroAddress)).to.be.rejectedWith("Initializable: contract is already initialized")
+    await expect(distributor.connect(attacker).setGauge(ethers.ZeroAddress, ethers.ZeroAddress)).to.be.rejectedWith("Ownable: caller is not the owner")
+    await expect(distributor.connect(attacker).skipPulls(ethers.ZeroAddress, 0)).to.be.rejectedWith("Ownable: caller is not the owner")
+    await expect(distributor.connect(attacker).pullNext(ethers.ZeroAddress)).to.be.rejectedWith("Ownable: caller is not the owner")
+    await expect(distributor.connect(attacker).updateMerkleRoot(ethers.ZeroAddress, ethers.ZeroAddress, {root: ethers.randomBytes(32), distributionStartBlock: 0, distributionEndBlock: 0})).to.be.rejectedWith("Ownable: caller is not the owner")
+  })
 });
