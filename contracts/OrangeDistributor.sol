@@ -36,6 +36,7 @@ contract OrangeDistributor is SYKPuller {
     event RewardClaimed(address indexed _user, address indexed _vault, address indexed token, uint _amount);
 
     error InvalidProof();
+    error InvalidRewardAmount();
 
     // Mapping from vault to token to merkle root
     mapping (address => mapping (address => MerkleRootData)) merkleRootData;
@@ -84,6 +85,8 @@ contract OrangeDistributor is SYKPuller {
      * particular epoch
      */
     function updateMerkleRoot(address _vault, address _token, MerkleRootData memory _merkleData) external onlyOwner {
+        // Sanity check, the total amount of tokens rewarded can't go down over time
+        if (_merkleData.rewardAmount < merkleRootData[_vault][_token].rewardAmount) revert InvalidRewardAmount();
         merkleRootData[_vault][_token] = _merkleData;
         emit MerkleRootUpdated(_vault, _token, _merkleData);
     }

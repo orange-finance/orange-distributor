@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import hre, { deployments, ethers, network } from "hardhat";
-import { ERC20, GaugeType1, IERC20, IGauge, IGaugeController, OrangeDistributor, OwnableUpgradeable } from "../typechain-types";
+import { ERC20, IGauge, IGaugeController, OrangeDistributor } from "../typechain-types";
 import { addTokenBalance } from "../utils/erc20";
 import { createRootAndProofs } from "../utils/merkle";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
@@ -121,6 +121,7 @@ describe("Gauge", function () {
       const {merkleTree, proofs} = createRootAndProofs(epochData)
   
       await distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: 3n * epoch1And2Reward})
+      await expect(distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: 1n})).to.be.revertedWithCustomError(distributor, "InvalidRewardAmount")
   
       const s0BalanceBefore = await rewardToken1.balanceOf(s0.address)
       await distributor.connect(s0).claim(vaultAddresses[0], rewardToken1Address, epoch1And2Reward / 2n, proofs[s0.address])
