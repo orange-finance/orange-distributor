@@ -10,6 +10,7 @@ import { ethers } from "ethers";
 require("dotenv").config();
 
 const signer = new ethers.Wallet(process.env.PRIVATE_KEY!);
+console.log(signer.address)
 
 const config: HardhatUserConfig = {
   solidity: "0.8.27",
@@ -26,6 +27,12 @@ const config: HardhatUserConfig = {
     arbitrum: {
       url: process.env.ARBITRUM_RPC,
       accounts: [process.env.PRIVATE_KEY!],
+      verify: {
+        etherscan: {
+          apiUrl: 'https://api.arbiscan.io',
+          apiKey: process.env.ARBISCAN_KEY!
+        }
+      },
     },
     arbitrumSepolia: {
       url: 'https://sepolia-rollup.arbitrum.io/rpc',
