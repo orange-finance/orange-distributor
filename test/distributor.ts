@@ -274,6 +274,14 @@ describe("Gauge", function () {
     })
   })
 
+  it("Withdraws tokens during emergency", async () => {
+    await addTokenBalance(rewardToken1Address, 1000n, await distributor.getAddress())
+    const balanceBefore = await rewardToken1.balanceOf(s0.address)
+    await distributor.emergencyWithdrawal(rewardToken1Address, 1000n)
+    const balanceAfter = await rewardToken1.balanceOf(s0.address)
+    expect(balanceAfter - balanceBefore).to.equal(1000n)
+  })
+
   it("Rejects unauthorized transactions", async () => {
     const attacker = (await ethers.getSigners())[5]
     await expect(distributor.initialize(ethers.ZeroAddress)).to.be.rejectedWith("Initializable: contract is already initialized")
@@ -281,5 +289,6 @@ describe("Gauge", function () {
     await expect(distributor.connect(attacker).skipPulls(ethers.ZeroAddress, 0)).to.be.rejectedWith("Ownable: caller is not the owner")
     await expect(distributor.connect(attacker).pullNext(ethers.ZeroAddress)).to.be.rejectedWith("Ownable: caller is not the owner")
     await expect(distributor.connect(attacker).updateMerkleRoot(ethers.ZeroAddress, ethers.ZeroAddress, {root: ethers.randomBytes(32), rewardAmount: 0})).to.be.rejectedWith("Ownable: caller is not the owner")
+    await expect(distributor.connect(attacker).emergencyWithdrawal(ethers.ZeroAddress, 100n)).to.be.rejectedWith("Ownable: caller is not the owner")
   })
 });

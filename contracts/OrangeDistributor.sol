@@ -99,4 +99,11 @@ contract OrangeDistributor is SYKPuller {
         merkleRootData[_vault][_token] = _merkleData;
         emit MerkleRootUpdated(_vault, _token, _merkleData);
     }
+
+    /**
+     * @notice Withdraw funds in case of emergency
+     */
+    function emergencyWithdrawal(address _token, uint _amount) external onlyOwner {
+        IERC20(_token).safeTransfer(owner(), _amount);
+    }
 }
