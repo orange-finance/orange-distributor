@@ -58,80 +58,93 @@ describe("Gauge", function () {
 
   describe("Normal token distribution", () => {
     it("Creates merkle root and proofs for distribution", async () => {
-      const epoch0Reward = ethers.parseUnits("100000", rewardToken1Decimals) / 5n
+      const epoch0Reward = ethers.parseUnits("1000", rewardToken1Decimals)
       const epochData = {
         [s0.address]: {
           user: s0.address,
           rootId: 0,
           proofs: [],
-          rewardAmount: epoch0Reward,
+          rewardAmount: epoch0Reward/3n,
           balance: 1n
         },
         [s1.address]: {
           user: s1.address,
           rootId: 0,
           proofs: [],
-          rewardAmount: epoch0Reward,
+          rewardAmount: epoch0Reward/3n,
           balance: 1n
         },
         [s2.address]: {
           user: s2.address,
           rootId: 0,
           proofs: [],
-          rewardAmount: epoch0Reward,
+          rewardAmount: epoch0Reward/3n,
           balance: 1n
         }
       }
       const {merkleTree, proofs} = createRootAndProofs(epochData)
   
-      await distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: epoch0Reward * 3n})
+      await distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: epoch0Reward})
   
       const s0BalanceBefore = await rewardToken1.balanceOf(s0.address)
-      await distributor.connect(s0).claim(vaultAddresses[0], rewardToken1Address, epoch0Reward, proofs[s0.address])
-      await expect(distributor.connect(s1).claim(vaultAddresses[0], rewardToken1Address, epoch0Reward, proofs[s0.address])).to.be.revertedWithCustomError(distributor, "InvalidProof")
+      await distributor.connect(s0).claim(vaultAddresses[0], rewardToken1Address, epoch0Reward/3n, proofs[s0.address])
+      await expect(distributor.connect(s1).claim(vaultAddresses[0], rewardToken1Address, epoch0Reward/3n, proofs[s0.address])).to.be.revertedWithCustomError(distributor, "InvalidProof")
       const s0BalanceAfter = await rewardToken1.balanceOf(s0.address)
-      expect(s0BalanceAfter - s0BalanceBefore).to.equal(epoch0Reward)
+      expect(s0BalanceAfter - s0BalanceBefore).to.equal(epoch0Reward/3n)
     })
   
-    it("Allows users to claim rewards for next epoch and prior epoch", async () => {
-      const epoch1And2Reward = 2n * ethers.parseUnits("100000", rewardToken1Decimals) / 5n
+    it("Multi claim", async () => {
+      const epoch1And2Reward = 2n * ethers.parseUnits("1000", rewardToken1Decimals)
       const epochData = {
         [s0.address]: {
           user: s0.address,
           rootId: 0,
           proofs: [],
-          rewardAmount: epoch1And2Reward,
+          rewardAmount: epoch1And2Reward/3n,
           balance: 1n
         },
         [s1.address]: {
           user: s1.address,
           rootId: 0,
           proofs: [],
-          rewardAmount: epoch1And2Reward,
+          rewardAmount: epoch1And2Reward/3n,
           balance: 1n
         },
         [s2.address]: {
           user: s2.address,
           rootId: 0,
           proofs: [],
-          rewardAmount: epoch1And2Reward,
+          rewardAmount: epoch1And2Reward/3n,
           balance: 1n
         }
       }
       const {merkleTree, proofs} = createRootAndProofs(epochData)
   
-      await distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: 3n * epoch1And2Reward})
+      await distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: epoch1And2Reward})
       await expect(distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: 1n})).to.be.revertedWithCustomError(distributor, "InvalidRewardAmount")
   
       const s0BalanceBefore = await rewardToken1.balanceOf(s0.address)
-      await distributor.connect(s0).claim(vaultAddresses[0], rewardToken1Address, epoch1And2Reward / 2n, proofs[s0.address])
+      await distributor.connect(s0).claim(vaultAddresses[0], rewardToken1Address, epoch1And2Reward / 6n, proofs[s0.address])
       const s0BalanceAfter = await rewardToken1.balanceOf(s0.address)
-      expect(s0BalanceAfter - s0BalanceBefore).to.equal(epoch1And2Reward / 2n)
+      expect(s0BalanceAfter - s0BalanceBefore).to.equal(epoch1And2Reward / 6n)
       
       const s1BalanceBefore = await rewardToken1.balanceOf(s1.address)
-      await distributor.connect(s1).claim(vaultAddresses[0], rewardToken1Address, epoch1And2Reward, proofs[s1.address])
+      await distributor.connect(s1).claim(vaultAddresses[0], rewardToken1Address, epoch1And2Reward / 3n, proofs[s1.address])
       const s1BalanceAfter = await rewardToken1.balanceOf(s1.address)
-      expect(s1BalanceAfter - s1BalanceBefore).to.equal(epoch1And2Reward)
+      expect(s1BalanceAfter - s1BalanceBefore).to.equal(epoch1And2Reward / 3n)
+
+
+      // Batch claims
+      await distributor.updateMerkleRoot(vaultAddresses[1], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: epoch1And2Reward})
+      const balanceS2Before = await rewardToken1.balanceOf(s2.address)
+      await distributor.connect(s2).batchClaim(
+        [vaultAddresses[0], vaultAddresses[1]],
+        [rewardToken1Address, rewardToken1Address],
+        [epoch1And2Reward / 3n, epoch1And2Reward / 3n],
+        [proofs[s2.address], proofs[s2.address]]
+      )
+      const balanceS2After = await rewardToken1.balanceOf(s2.address)
+      expect(balanceS2After - balanceS2Before).to.closeTo(2n * epoch1And2Reward / 3n, 1n)
     })
   })
 

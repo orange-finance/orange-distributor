@@ -57,7 +57,7 @@ contract OrangeDistributor is SYKPuller {
      * @param _amount Amount of token to claim as reward
      * @param merkleProof Merkle proof
      */
-    function claim(address _vault, address _token, uint256 _amount, bytes32[] calldata merkleProof) external {
+    function claim(address _vault, address _token, uint256 _amount, bytes32[] calldata merkleProof) public {
         claimed[_vault][_token][msg.sender]+=_amount;
         
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender, claimed[_vault][_token][msg.sender]));
@@ -72,6 +72,15 @@ contract OrangeDistributor is SYKPuller {
         }
 
         emit RewardClaimed(msg.sender, _vault, _token, _amount);
+    }
+
+    /**
+     * @notice Claim multiple token rewards in a single call
+     */
+    function batchClaim(address[] calldata _vaults, address[] calldata _tokens, uint256[] calldata _amounts, bytes32[][] calldata merkleProofs) external {
+        for (uint i = 0; i<_vaults.length; i++) {
+            claim(_vaults[i], _tokens[i], _amounts[i], merkleProofs[i]);
+        }
     }
 
     /**

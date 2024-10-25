@@ -11,7 +11,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
  * @notice Abstract contract with logic for pulling rewards
  * from stryke reward gauges
  *
- * @dev The contract needs to be made the owner of the gauges
+ * @dev The SYKPuller contract needs to be made the owner of the gauges
  * that it will be pulling rewards from
  */
 abstract contract SYKPuller is OwnableUpgradeable {
