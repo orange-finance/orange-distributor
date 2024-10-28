@@ -84,7 +84,7 @@ describe("Gauge", function () {
       }
       const {merkleTree, proofs} = createRootAndProofs(epochData)
   
-      await distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: epoch0Reward})
+      await distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, merkleTree.getHexRoot())
   
       const s0BalanceBefore = await rewardToken1.balanceOf(s0.address)
       await distributor.connect(s0).claim(vaultAddresses[0], rewardToken1Address, epoch0Reward/3n, proofs[s0.address])
@@ -120,8 +120,7 @@ describe("Gauge", function () {
       }
       const {merkleTree, proofs} = createRootAndProofs(epochData)
   
-      await distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: epoch1And2Reward})
-      await expect(distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: 1n})).to.be.revertedWithCustomError(distributor, "InvalidRewardAmount")
+      await distributor.updateMerkleRoot(vaultAddresses[0], rewardToken1Address, merkleTree.getHexRoot())
   
       const s0BalanceBefore = await rewardToken1.balanceOf(s0.address)
       await distributor.connect(s0).claim(vaultAddresses[0], rewardToken1Address, epoch1And2Reward / 6n, proofs[s0.address])
@@ -135,7 +134,7 @@ describe("Gauge", function () {
 
 
       // Batch claims
-      await distributor.updateMerkleRoot(vaultAddresses[1], rewardToken1Address, {root: merkleTree.getHexRoot(), rewardAmount: epoch1And2Reward})
+      await distributor.updateMerkleRoot(vaultAddresses[1], rewardToken1Address, merkleTree.getHexRoot())
       const balanceS2Before = await rewardToken1.balanceOf(s2.address)
       await distributor.connect(s2).batchClaim(
         [vaultAddresses[0], vaultAddresses[1]],
@@ -246,7 +245,7 @@ describe("Gauge", function () {
         }
         const {merkleTree, proofs} = createRootAndProofs(epochData)
     
-        await distributor.updateMerkleRoot(vault, await distributor.syk(), {root: merkleTree.getHexRoot(), rewardAmount: epoch0Reward})
+        await distributor.updateMerkleRoot(vault, await distributor.syk(), merkleTree.getHexRoot())
     
         await distributor.connect(s0).claim(vault, await distributor.syk(), epoch0Reward / 4n, proofs[s0.address])
         await distributor.connect(s1).claim(vault, await distributor.syk(), epoch0Reward / 4n, proofs[s1.address])
@@ -288,7 +287,7 @@ describe("Gauge", function () {
     await expect(distributor.connect(attacker).setGauge(ethers.ZeroAddress, ethers.ZeroAddress)).to.be.rejectedWith("Ownable: caller is not the owner")
     await expect(distributor.connect(attacker).skipPulls(ethers.ZeroAddress, 0)).to.be.rejectedWith("Ownable: caller is not the owner")
     await expect(distributor.connect(attacker).pullNext(ethers.ZeroAddress)).to.be.rejectedWith("Ownable: caller is not the owner")
-    await expect(distributor.connect(attacker).updateMerkleRoot(ethers.ZeroAddress, ethers.ZeroAddress, {root: ethers.randomBytes(32), rewardAmount: 0})).to.be.rejectedWith("Ownable: caller is not the owner")
+    await expect(distributor.connect(attacker).updateMerkleRoot(ethers.ZeroAddress, ethers.ZeroAddress, ethers.randomBytes(32))).to.be.rejectedWith("Ownable: caller is not the owner")
     await expect(distributor.connect(attacker).emergencyWithdrawal(ethers.ZeroAddress, 100n)).to.be.rejectedWith("Ownable: caller is not the owner")
   })
 });

@@ -38,8 +38,6 @@ abstract contract SYKPuller is OwnableUpgradeable {
     address public syk;
     address public xSyk;
 
-    constructor() {}
-
     function __SYKPuller_init (IGaugeController _controller) internal initializer {
         __Ownable_init();
         controller = _controller;

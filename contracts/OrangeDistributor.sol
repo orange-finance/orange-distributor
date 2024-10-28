@@ -27,24 +27,16 @@ import {IXStrykeToken} from "./interfaces/IXStrykeToken.sol";
 contract OrangeDistributor is SYKPuller {
     using SafeERC20 for IERC20;
 
-    struct MerkleRootData {
-        bytes32 root;           // Merkle root for distributing reward token
-        uint rewardAmount;      // Total amount of reward token to be distributed
-    }
-
-    event MerkleRootUpdated(address indexed _vault, address indexed _token, MerkleRootData _newMerkleRoot);
+    event MerkleRootUpdated(address indexed _vault, address indexed _token, bytes32 _newMerkleRoot);
     event RewardClaimed(address indexed _user, address indexed _vault, address indexed token, uint _amount);
 
     error InvalidProof();
-    error InvalidRewardAmount();
 
     // Mapping from vault to token to merkle root
-    mapping (address => mapping (address => MerkleRootData)) public merkleRootData;
+    mapping (address => mapping (address => bytes32)) public merkleRoot;
 
     // Mapping from vault to depositor to token to amount of token claimed
     mapping (address => mapping (address => mapping (address => uint))) public claimed;
-
-    constructor() {}
 
     function initialize(IGaugeController _controller) external initializer {
         __SYKPuller_init(_controller);
@@ -61,7 +53,7 @@ contract OrangeDistributor is SYKPuller {
         claimed[_vault][_token][msg.sender]+=_amount;
         
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender, claimed[_vault][_token][msg.sender]));
-        if (!MerkleProof.verifyCalldata(merkleProof, merkleRootData[_vault][_token].root, leaf)) revert InvalidProof();
+        if (!MerkleProof.verifyCalldata(merkleProof, merkleRoot[_vault][_token], leaf)) revert InvalidProof();
 
         if (_token==syk) {
             IERC20(syk).safeIncreaseAllowance(xSyk, _amount/2);
@@ -87,17 +79,11 @@ contract OrangeDistributor is SYKPuller {
      * @notice Update the merkle root for the reward token distribution of a vault
      * @param _vault The vault whose token is to be distributed using the merkle root
      * @param _token The reward token for the vault
-     * @param _merkleData Struct containing merkle root and total reward amount to be distributed
-     *
-     * @dev _merkleData.rewardAmount should be the total amount of reward distributed for
-     * the vault since inception rather than the amount of reward distributed for a
-     * particular epoch
+     * @param _merkleRoot New root for reward distribution
      */
-    function updateMerkleRoot(address _vault, address _token, MerkleRootData memory _merkleData) external onlyOwner {
-        // Sanity check, the total amount of tokens rewarded can't go down over time
-        if (_merkleData.rewardAmount < merkleRootData[_vault][_token].rewardAmount) revert InvalidRewardAmount();
-        merkleRootData[_vault][_token] = _merkleData;
-        emit MerkleRootUpdated(_vault, _token, _merkleData);
+    function updateMerkleRoot(address _vault, address _token, bytes32 _merkleRoot) external onlyOwner {
+        merkleRoot[_vault][_token] = _merkleRoot;
+        emit MerkleRootUpdated(_vault, _token, _merkleRoot);
     }
 
     /**
