@@ -53,12 +53,12 @@ contract OrangeDistributor is SYKPuller {
         claimed[_vault][_token][msg.sender]+=_amount;
         
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender, claimed[_vault][_token][msg.sender]));
-        if (!MerkleProof.verifyCalldata(merkleProof, merkleRoot[_vault][_token], leaf)) revert InvalidProof();
+        require(MerkleProof.verifyCalldata(merkleProof, merkleRoot[_vault][_token], leaf), InvalidProof());
 
         if (_token==syk) {
             IERC20(syk).safeIncreaseAllowance(xSyk, _amount/2);
             IXStrykeToken(xSyk).convert(_amount / 2, msg.sender);
-            IERC20(_token).safeTransfer(msg.sender, _amount/2);
+            IERC20(_token).safeTransfer(msg.sender, _amount - _amount/2);
         } else {
             IERC20(_token).safeTransfer(msg.sender, _amount);
         }

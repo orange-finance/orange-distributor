@@ -75,11 +75,11 @@ abstract contract SYKPuller is OwnableUpgradeable {
      * @notice Pull the rewards for the next epoch from the gauge
      */
     function pullNext(address _vault) external onlyOwner {
+        uint nextEpoch = nextStrykeEpochToPull[_vault]++;
         uint balanceBefore = ERC20(syk).balanceOf(address(this));
-        IGauge(gauges[_vault]).pull(nextStrykeEpochToPull[_vault]);
+        IGauge(gauges[_vault]).pull(nextEpoch);
         uint balanceAfter = ERC20(syk).balanceOf(address(this));
-        epochRewards[_vault][nextStrykeEpochToPull[_vault]] = balanceAfter - balanceBefore;
-        nextStrykeEpochToPull[_vault]+=1;
+        epochRewards[_vault][nextEpoch] = balanceAfter - balanceBefore;
         emit RewardPulled(_vault, balanceAfter - balanceBefore);
     }
 }
