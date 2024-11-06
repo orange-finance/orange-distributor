@@ -20,8 +20,6 @@ abstract contract SYKPuller is OwnableUpgradeable {
     event RewardPulled(address indexed _vault, uint _amount);
     event SkipPulls(address indexed _vault, uint _nextEpochToPull);
 
-    error InvalidEpoch();
-
     // Mapping from vault to next reward epoch to pull
     mapping (address => uint) public nextStrykeEpochToPull;
 
@@ -39,7 +37,7 @@ abstract contract SYKPuller is OwnableUpgradeable {
     address public xSyk;
 
     function __SYKPuller_init (IGaugeController _controller) internal initializer {
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         controller = _controller;
         syk = controller.syk();
         xSyk = controller.xSyk();

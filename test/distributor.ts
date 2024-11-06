@@ -283,11 +283,11 @@ describe("Gauge", function () {
 
   it("Rejects unauthorized transactions", async () => {
     const attacker = (await ethers.getSigners())[5]
-    await expect(distributor.initialize(ethers.ZeroAddress)).to.be.rejectedWith("Initializable: contract is already initialized")
-    await expect(distributor.connect(attacker).setGauge(ethers.ZeroAddress, ethers.ZeroAddress)).to.be.rejectedWith("Ownable: caller is not the owner")
-    await expect(distributor.connect(attacker).skipPulls(ethers.ZeroAddress, 0)).to.be.rejectedWith("Ownable: caller is not the owner")
-    await expect(distributor.connect(attacker).pullNext(ethers.ZeroAddress)).to.be.rejectedWith("Ownable: caller is not the owner")
-    await expect(distributor.connect(attacker).updateMerkleRoot(ethers.ZeroAddress, ethers.ZeroAddress, ethers.randomBytes(32))).to.be.rejectedWith("Ownable: caller is not the owner")
-    await expect(distributor.connect(attacker).emergencyWithdrawal(ethers.ZeroAddress, 100n)).to.be.rejectedWith("Ownable: caller is not the owner")
+    await expect(distributor.initialize(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "InvalidInitialization")
+    await expect(distributor.connect(attacker).setGauge(ethers.ZeroAddress, ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
+    await expect(distributor.connect(attacker).skipPulls(ethers.ZeroAddress, 0)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
+    await expect(distributor.connect(attacker).pullNext(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
+    await expect(distributor.connect(attacker).updateMerkleRoot(ethers.ZeroAddress, ethers.ZeroAddress, ethers.randomBytes(32))).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
+    await expect(distributor.connect(attacker).emergencyWithdrawal(ethers.ZeroAddress, 100n)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
   })
 });

@@ -35,11 +35,11 @@ contract GaugeType1 is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     /// @param _initialOwner Address to be set as the owner of the contract.
     /// @param _gaugeController Address of the GaugeController contract.
     /// @param _syk Address of the SYK token contract.
-    function initialize(address _initialOwner, address _gaugeController, address _syk) public initializer {
+    function initialize(address _initialOwner, address _gaugeController, address _syk) public reinitializer(2) {
         gaugeController = IGaugeController(_gaugeController);
         syk = IERC20(_syk);
 
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
     }
 
