@@ -1,0 +1,33 @@
+{
+  "name": "xsyk-distributor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "hardhat deploy --network arbitrum",
+    "verify": "hardhat --network arbitrum etherscan-verify"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.12",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.11",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@typechain/hardhat": "^9.1.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.4",
+    "hardhat": "^2.22.12",
+    "hardhat-deploy": "^0.12.4",
+    "hardhat-deploy-ethers": "^0.4.2",
+    "solidity-coverage": "^0.8.13"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts-upgradeable": "^4.1.0",
+    "keccak256": "^1.0.6",
+    "merkletreejs": "^0.4.0"
+  }
+}
