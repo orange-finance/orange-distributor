@@ -19,6 +19,10 @@ abstract contract SYKPuller is OwnableUpgradeable {
     event SetGauge(address indexed _vault, address indexed _gauge);
     event RewardPulled(address indexed _vault, uint _amount);
     event SkipPulls(address indexed _vault, uint _nextEpochToPull);
+    event SetKeeper(address indexed _keeper);
+
+    error Unauthorized();
+    error VaultGaugeArrayMismatch();
 
     // Mapping from vault to next reward epoch to pull
     mapping (address => uint) public nextStrykeEpochToPull;
@@ -32,15 +36,31 @@ abstract contract SYKPuller is OwnableUpgradeable {
     // Stryke gauge controller
     IGaugeController public controller;
 
+    address public keeper;
+
     // Stryke tokens
     address public syk;
     address public xSyk;
 
-    function __SYKPuller_init (IGaugeController _controller) internal initializer {
+    function __SYKPuller_init (IGaugeController _controller, address _keeper, address[] memory _vaults, address[] memory _gauges) internal initializer {
         __Ownable_init(msg.sender);
         controller = _controller;
         syk = controller.syk();
         xSyk = controller.xSyk();
+        keeper = _keeper;
+
+        require(_vaults.length==_gauges.length, VaultGaugeArrayMismatch());
+        for (uint i = 0; i<_vaults.length; i++) {
+            gauges[_vaults[i]] = _gauges[i];
+            emit SetGauge(_vaults[i], _gauges[i]);
+        }
+
+        emit SetKeeper(_keeper);
+    }
+
+    modifier restricted() {
+        require(msg.sender==keeper || msg.sender==owner(), Unauthorized());
+        _;
     }
 
     /**
@@ -61,6 +81,14 @@ abstract contract SYKPuller is OwnableUpgradeable {
     }
 
     /**
+     * @notice Update keeper address
+     */
+    function setKeeper(address _keeper) external onlyOwner {
+        keeper = _keeper;
+        emit SetKeeper(_keeper);
+    }
+
+    /**
      * @notice Admin function to manually set the next epoch whose rewards
      * will be pulled.
      */
@@ -72,7 +100,7 @@ abstract contract SYKPuller is OwnableUpgradeable {
     /**
      * @notice Pull the rewards for the next epoch from the gauge
      */
-    function pullNext(address _vault) external onlyOwner {
+    function pullNext(address _vault) external restricted {
         uint nextEpoch = nextStrykeEpochToPull[_vault]++;
         uint balanceBefore = ERC20(syk).balanceOf(address(this));
         IGauge(gauges[_vault]).pull(nextEpoch);

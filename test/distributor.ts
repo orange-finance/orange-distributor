@@ -281,13 +281,48 @@ describe("Gauge", function () {
     expect(balanceAfter - balanceBefore).to.equal(1000n)
   })
 
+  it("Updates keeper", async () => {
+    await distributor.setKeeper((await ethers.getSigners())[3])
+    expect(await distributor.keeper()).to.equal((await ethers.getSigners())[3])
+  })
+
   it("Rejects unauthorized transactions", async () => {
     const attacker = (await ethers.getSigners())[5]
-    await expect(distributor.initialize(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "InvalidInitialization")
+    await expect(distributor.initialize(ethers.ZeroAddress, ethers.ZeroAddress, [], [])).to.be.revertedWithCustomError(distributor, "InvalidInitialization")
     await expect(distributor.connect(attacker).setGauge(ethers.ZeroAddress, ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).skipPulls(ethers.ZeroAddress, 0)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
-    await expect(distributor.connect(attacker).pullNext(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
-    await expect(distributor.connect(attacker).updateMerkleRoot(ethers.ZeroAddress, ethers.ZeroAddress, ethers.randomBytes(32))).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
+    await expect(distributor.connect(attacker).setKeeper(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
+    await expect(distributor.connect(attacker).pullNext(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "Unauthorized")
+    await expect(distributor.connect(attacker).updateMerkleRoot(ethers.ZeroAddress, ethers.ZeroAddress, ethers.randomBytes(32))).to.be.revertedWithCustomError(distributor, "Unauthorized")
     await expect(distributor.connect(attacker).emergencyWithdrawal(ethers.ZeroAddress, 100n)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
+
+    const {deploy} = deployments;
+    await expect(deploy("OrangeDistributor2", {
+      from: (await ethers.getSigners())[0].address,
+      contract: "OrangeDistributor",
+      proxy: {
+        execute: {
+          init: {
+            methodName: "initialize",
+            args: [
+              "0xFdf1B2c4E291b17f8E998e89cF28985fAF3cE6A1",
+              "0xd31583735e47206e9af728EF4f44f62B20db4b27",
+              [
+                "0x5f6D5a7e8eccA2A53C6322a96e9a48907A8284e0",
+              ],
+              [
+                "0x4927a62feFE180f9E6307Ef5cb34f94FcAd09227",
+                "0x97b1f6a13500de55B62b57B2D9e30Ca9E9bAB11B",
+                "0x61e9B42f28cdF30173c591b2eB38023ed969d437"
+              ]
+            ],
+          },
+        },
+        proxyContract: "OpenZeppelinTransparentProxy",
+      },
+      log: true,
+      autoMine: true,
+    })).to.be.revertedWithCustomError(distributor, "VaultGaugeArrayMismatch")
   })
+  console.log("CHECK2")
 });

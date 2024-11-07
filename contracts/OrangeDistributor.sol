@@ -38,8 +38,8 @@ contract OrangeDistributor is SYKPuller {
     // Mapping from vault to depositor to token to amount of token claimed
     mapping (address => mapping (address => mapping (address => uint))) public claimed;
 
-    function initialize(IGaugeController _controller) external initializer {
-        __SYKPuller_init(_controller);
+    function initialize(IGaugeController _controller, address _keeper, address[] memory _vaults, address[] memory _gauges) external initializer {
+        __SYKPuller_init(_controller, _keeper, _vaults, _gauges);
     }
 
     /**
@@ -81,7 +81,7 @@ contract OrangeDistributor is SYKPuller {
      * @param _token The reward token for the vault
      * @param _merkleRoot New root for reward distribution
      */
-    function updateMerkleRoot(address _vault, address _token, bytes32 _merkleRoot) external onlyOwner {
+    function updateMerkleRoot(address _vault, address _token, bytes32 _merkleRoot) external restricted {
         merkleRoot[_vault][_token] = _merkleRoot;
         emit MerkleRootUpdated(_vault, _token, _merkleRoot);
     }
