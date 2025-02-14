@@ -13,6 +13,7 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
           methodName: "initialize",
           args: [
             "0xFdf1B2c4E291b17f8E998e89cF28985fAF3cE6A1",
+            "0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25",
             "0xd31583735e47206e9af728EF4f44f62B20db4b27",
             [
               "0x5f6D5a7e8eccA2A53C6322a96e9a48907A8284e0",

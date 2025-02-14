@@ -5,6 +5,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IGauge} from "./interfaces/IGauge.sol";
+import {ISYKDepositor} from "./interfaces/ISYKDepositor.sol";
 import {IGaugeController} from "./interfaces/IGaugeController.sol";
 import {SYKPuller} from "./SYKPuller.sol";
 import {IXStrykeToken} from "./interfaces/IXStrykeToken.sol";
@@ -32,14 +33,18 @@ contract OrangeDistributor is SYKPuller {
 
     error InvalidProof();
 
+    // Plutus depositor
+    ISYKDepositor public sykDepositor;
+    
     // Mapping from vault to token to merkle root
     mapping (address => mapping (address => bytes32)) public merkleRoot;
 
     // Mapping from vault to depositor to token to amount of token claimed
     mapping (address => mapping (address => mapping (address => uint))) public claimed;
 
-    function initialize(IGaugeController _controller, address _keeper, address[] memory _vaults, address[] memory _gauges) external initializer {
+    function initialize(IGaugeController _controller, ISYKDepositor _sykDepositor, address _keeper, address[] memory _vaults, address[] memory _gauges) external initializer {
         __SYKPuller_init(_controller, _keeper, _vaults, _gauges);
+        sykDepositor = _sykDepositor;
     }
 
     /**
@@ -56,8 +61,15 @@ contract OrangeDistributor is SYKPuller {
         require(MerkleProof.verifyCalldata(merkleProof, merkleRoot[_vault][_token], leaf), InvalidProof());
 
         if (_token==syk) {
-            IERC20(syk).safeIncreaseAllowance(xSyk, _amount/2);
-            IXStrykeToken(xSyk).convert(_amount / 2, msg.sender);
+            // xSYK transfer
+            // IERC20(syk).safeIncreaseAllowance(xSyk, _amount/2);
+            // IXStrykeToken(xSyk).convert(_amount / 2, msg.sender);
+
+            // plsSYK transfer
+            IERC20(syk).safeIncreaseAllowance(address(sykDepositor), _amount/2);
+            sykDepositor.deposit(_amount / 2);
+            IERC20(sykDepositor.minter()).safeTransfer(msg.sender, _amount/2);
+
             IERC20(_token).safeTransfer(msg.sender, _amount - _amount/2);
         } else {
             IERC20(_token).safeTransfer(msg.sender, _amount);
