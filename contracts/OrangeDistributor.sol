@@ -66,11 +66,15 @@ contract OrangeDistributor is SYKPuller {
             // IXStrykeToken(xSyk).convert(_amount / 2, msg.sender);
 
             // plsSYK transfer
-            IERC20(syk).safeIncreaseAllowance(address(sykDepositor), _amount/2);
-            sykDepositor.deposit(_amount / 2);
-            IERC20(sykDepositor.minter()).safeTransfer(msg.sender, _amount/2);
+            uint plsSykAmount = _amount>2e16?_amount/2:0;
+            uint sykAmount = _amount - plsSykAmount;
+            if (plsSykAmount>0) {
+                IERC20(syk).safeIncreaseAllowance(address(sykDepositor), plsSykAmount);
+                sykDepositor.deposit(plsSykAmount);
+                IERC20(sykDepositor.minter()).safeTransfer(msg.sender, plsSykAmount);
+            }
 
-            IERC20(_token).safeTransfer(msg.sender, _amount - _amount/2);
+            IERC20(_token).safeTransfer(msg.sender, sykAmount);
         } else {
             IERC20(_token).safeTransfer(msg.sender, _amount);
         }
