@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import hre, { deployments, ethers, network } from "hardhat";
-import { ERC20, IGauge, IGaugeController, OrangeDistributor } from "../typechain-types";
+import { ERC20, IGauge, IGaugeController, IPlutusWhitelist, OrangeDistributor } from "../typechain-types";
 import { addTokenBalance } from "../utils/erc20";
 import { createRootAndProofs } from "../utils/merkle";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
@@ -22,6 +22,7 @@ describe("Gauge", function () {
   const rewardToken1Address = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
   let syk: ERC20
   let xSyk: ERC20
+  let plsSyk: ERC20
   let rewardToken1: ERC20
   let rewardToken1Decimals: bigint
   let vaults: ERC20[] = []
@@ -35,6 +36,9 @@ describe("Gauge", function () {
   let s4: SignerWithAddress
 
   before(async () => {
+    const errorFactory = await ethers.getContractFactory("TestErrors")
+    const errorsContract = await errorFactory.deploy()
+    console.log(errorsContract.interface.getError("0xfb8f41b2"));
     await deployments.fixture()
     controller = await ethers.getContractAt("IGaugeController", controllerAddress)
     vaults = await Promise.all(vaultAddresses.map(address => ethers.getContractAt("ERC20", address)))
@@ -45,6 +49,7 @@ describe("Gauge", function () {
     distributor = await ethers.getContractAt("OrangeDistributor", (await deployments.get("OrangeDistributor")).address)
     syk = await ethers.getContractAt("ERC20", await distributor.syk())
     xSyk = await ethers.getContractAt("ERC20", await distributor.xSyk())
+    plsSyk = await ethers.getContractAt("ERC20", "0x68D6d2545f14751baF36c417c2CC7cdf8dA8a15b")
 
     await addTokenBalance(rewardToken1Address, ethers.parseUnits("100000000", rewardToken1Decimals), await distributor.getAddress())
 
@@ -54,6 +59,14 @@ describe("Gauge", function () {
     s2 = signers[2]
     s3 = signers[3]
     s4 = signers[4]
+
+    
+    await network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: ["0xa5c1c5a67Ba16430547FEA9D608Ef81119bE1876"],
+    });
+    const plutusWhitelist = await ethers.getContractAt("IPlutusWhitelist", "0xa075222F01cD4C8b20C2f2e0ee2D78d642e68537")
+    plutusWhitelist.connect(await ethers.getSigner("0xa5c1c5a67Ba16430547FEA9D608Ef81119bE1876")).addToWhitelist(distributor.getAddress())
   })
 
   describe("Normal token distribution", () => {
@@ -158,6 +171,10 @@ describe("Gauge", function () {
           params: [ownerAddress],
         });
         const owner = await ethers.getSigner(ownerAddress)
+        await network.provider.send("hardhat_setBalance", [
+          ownerAddress,
+          "0x1000000000000000000000",
+        ]);
         await gauge.connect(owner).transferOwnership(distributor.getAddress())
       }))
       for (const [i, vault] of vaultAddresses.entries()) {
@@ -203,9 +220,6 @@ describe("Gauge", function () {
     })
 
     it("Pulls rewards from gauge", async () => {
-      // const errorFactory = await ethers.getContractFactory("Errors")
-      // const errorsContract = await errorFactory.deploy()
-      // console.log(errorsContract.interface.getError("0xe4529edb"));
       const syk: ERC20 = await ethers.getContractAt("ERC20", await distributor.syk())
       for (const vault of vaultAddresses) {
         const balanceBefore = await syk.balanceOf(distributor.getAddress())
@@ -251,11 +265,11 @@ describe("Gauge", function () {
         await distributor.connect(s1).claim(vault, await distributor.syk(), epoch0Reward / 4n, proofs[s1.address])
         await distributor.connect(s2).claim(vault, await distributor.syk(), epoch0Reward / 2n, proofs[s2.address])
         const s0BalanceAfterSyk = await syk.balanceOf(s0.address)
-        const s0BalanceAfterxSyk = await xSyk.balanceOf(s0.address)
+        const s0BalanceAfterxSyk = await plsSyk.balanceOf(s0.address)
         const s1BalanceAfterSyk = await syk.balanceOf(s1.address)
-        const s1BalanceAfterxSyk = await xSyk.balanceOf(s1.address)
+        const s1BalanceAfterxSyk = await plsSyk.balanceOf(s1.address)
         const s2BalanceAfterSyk = await syk.balanceOf(s2.address)
-        const s2BalanceAfterxSyk = await xSyk.balanceOf(s2.address)
+        const s2BalanceAfterxSyk = await plsSyk.balanceOf(s2.address)
 
         expect(s1BalanceAfterSyk).to.closeTo(s0BalanceAfterSyk, 1n)
         expect(s2BalanceAfterSyk).to.closeTo(s0BalanceAfterSyk * 2n, 1n)
@@ -288,7 +302,7 @@ describe("Gauge", function () {
 
   it("Rejects unauthorized transactions", async () => {
     const attacker = (await ethers.getSigners())[5]
-    await expect(distributor.initialize(ethers.ZeroAddress, ethers.ZeroAddress, [], [])).to.be.revertedWithCustomError(distributor, "InvalidInitialization")
+    await expect(distributor.initialize(ethers.ZeroAddress, ethers.ZeroAddress, ethers.ZeroAddress, [], [])).to.be.revertedWithCustomError(distributor, "InvalidInitialization")
     await expect(distributor.connect(attacker).setGauge(ethers.ZeroAddress, ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).skipPulls(ethers.ZeroAddress, 0)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).setKeeper(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
@@ -306,6 +320,7 @@ describe("Gauge", function () {
             methodName: "initialize",
             args: [
               "0xFdf1B2c4E291b17f8E998e89cF28985fAF3cE6A1",
+              "0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25",
               "0xd31583735e47206e9af728EF4f44f62B20db4b27",
               [
                 "0x5f6D5a7e8eccA2A53C6322a96e9a48907A8284e0",
@@ -324,5 +339,4 @@ describe("Gauge", function () {
       autoMine: true,
     })).to.be.revertedWithCustomError(distributor, "VaultGaugeArrayMismatch")
   })
-  console.log("CHECK2")
 });

@@ -4,6 +4,18 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
   const {deploy} = deployments;
   const {deployer} = await getNamedAccounts();
 
+  const arbitrumGaugeController = "0x82C13fCab02A168F06E12373F9e5D2C2Bd47e399"
+  const arbitrumVaults = [
+    "0x9338a4c3De7082E27802DCB6AC5A4502C93D1808",
+    "0xa3899444a955Fb1DdDbd7Aea385771DB0a67fB12",
+    "0x8b20087Bb0580bCB827d3ebDF06485aF86ea16cB",
+  ]
+  const arbitrumGauges = [
+    "0x6B8E05cA2A6bd2E8b208B98F7b136E45Da5DAb63",
+    "0xe68161C93A241012ABcfcE8e3AB74Ad55a96b98f",
+    "0x78F874b79C144139125a253fc8130d35BbB66825"
+  ]
+
   await deploy("OrangeDistributor", {
     from: deployer,
     contract: "OrangeDistributor",
@@ -12,18 +24,11 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
         init: {
           methodName: "initialize",
           args: [
-            "0xFdf1B2c4E291b17f8E998e89cF28985fAF3cE6A1",
+            arbitrumGaugeController,
+            "0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25",
             "0xd31583735e47206e9af728EF4f44f62B20db4b27",
-            [
-              "0x5f6D5a7e8eccA2A53C6322a96e9a48907A8284e0",
-              "0x22dd31a495CafB229131A16C54a8e5b2f43C1162",
-              "0xE32132282D181967960928b77236B3c472d5f396",
-            ],
-            [
-              "0x4927a62feFE180f9E6307Ef5cb34f94FcAd09227",
-              "0x97b1f6a13500de55B62b57B2D9e30Ca9E9bAB11B",
-              "0x61e9B42f28cdF30173c591b2eB38023ed969d437"
-            ]
+            arbitrumVaults,
+            arbitrumGauges
           ],
         },
       },
