@@ -30,6 +30,7 @@ contract OrangeDistributor is SYKPuller {
 
     event MerkleRootUpdated(address indexed _vault, address indexed _token, bytes32 _newMerkleRoot);
     event RewardClaimed(address indexed _user, address indexed _vault, address indexed token, uint _amount);
+    event SetSykDepositor(address _previousDepositor, address _newDepositor);
 
     error InvalidProof();
 
@@ -42,8 +43,12 @@ contract OrangeDistributor is SYKPuller {
     // Mapping from vault to depositor to token to amount of token claimed
     mapping (address => mapping (address => mapping (address => uint))) public claimed;
 
-    function initialize(IGaugeController _controller, ISYKDepositor _sykDepositor, address _keeper, address[] memory _vaults, address[] memory _gauges) external initializer {
-        __SYKPuller_init(_controller, _keeper, _vaults, _gauges);
+    function initialize(address _keeper) external initializer {
+        __SYKPuller_init(_keeper);
+    }
+
+    function setSykDepositor(ISYKDepositor _sykDepositor) external onlyOwner {
+        emit SetSykDepositor(address(sykDepositor), address(_sykDepositor));
         sykDepositor = _sykDepositor;
     }
 

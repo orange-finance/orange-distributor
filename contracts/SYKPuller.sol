@@ -20,6 +20,7 @@ abstract contract SYKPuller is OwnableUpgradeable {
     event RewardPulled(address indexed _vault, uint _amount);
     event SkipPulls(address indexed _vault, uint _nextEpochToPull);
     event SetKeeper(address indexed _keeper);
+    event SetController(address _previousController, address _newController);
 
     error Unauthorized();
     error VaultGaugeArrayMismatch();
@@ -42,19 +43,9 @@ abstract contract SYKPuller is OwnableUpgradeable {
     address public syk;
     address public xSyk;
 
-    function __SYKPuller_init (IGaugeController _controller, address _keeper, address[] memory _vaults, address[] memory _gauges) internal initializer {
+    function __SYKPuller_init (address _keeper) internal initializer {
         __Ownable_init(msg.sender);
-        controller = _controller;
-        syk = controller.syk();
-        xSyk = controller.xSyk();
         keeper = _keeper;
-
-        require(_vaults.length==_gauges.length, VaultGaugeArrayMismatch());
-        for (uint i = 0; i<_vaults.length; i++) {
-            gauges[_vaults[i]] = _gauges[i];
-            emit SetGauge(_vaults[i], _gauges[i]);
-        }
-
         emit SetKeeper(_keeper);
     }
 
@@ -68,6 +59,13 @@ abstract contract SYKPuller is OwnableUpgradeable {
      */
     function canPullNext(address _vault) external view returns (bool) {
         return controller.epochFinalized(nextStrykeEpochToPull[_vault]);
+    }
+
+    function setController(IGaugeController _controller) external onlyOwner {
+        emit SetController(address(controller), address(_controller));
+        controller = _controller;
+        syk = controller.syk();
+        xSyk = controller.xSyk();
     }
 
     /**

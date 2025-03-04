@@ -4,6 +4,7 @@ import { ERC20, IGauge, IGaugeController, IPlutusWhitelist, OrangeDistributor } 
 import { addTokenBalance } from "../utils/erc20";
 import { createRootAndProofs } from "../utils/merkle";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { parseEther } from "ethers";
 
 describe("Gauge", function () {
   const controllerAddress = "0xFdf1B2c4E291b17f8E998e89cF28985fAF3cE6A1"
@@ -35,10 +36,48 @@ describe("Gauge", function () {
   let s3: SignerWithAddress
   let s4: SignerWithAddress
 
+  const deployTestDistributor = async () => {
+    const {deploy} = deployments;
+    const deployment = await deploy("TestOrangeDistributor2", {
+      from: (await ethers.getSigners())[0].address,
+      contract: "OrangeDistributor",
+      proxy: {
+        execute: {
+          init: {
+            methodName: "initialize",
+            args: [
+              "0xd31583735e47206e9af728EF4f44f62B20db4b27",
+            ],
+          },
+        },
+        proxyContract: "OpenZeppelinTransparentProxy",
+      },
+      log: true,
+      autoMine: true,
+    })
+    distributor = await ethers.getContractAt("OrangeDistributor", deployment.address)
+    await distributor.setController("0xFdf1B2c4E291b17f8E998e89cF28985fAF3cE6A1")
+    await distributor.setSykDepositor("0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25")
+    const arbitrumVaults = [
+      "0x4927a62feFE180f9E6307Ef5cb34f94FcAd09227",
+      "0x97b1f6a13500de55B62b57B2D9e30Ca9E9bAB11B",
+      "0x61e9B42f28cdF30173c591b2eB38023ed969d437"
+    ]
+    const arbitrumGauges = [
+      "0x5f6D5a7e8eccA2A53C6322a96e9a48907A8284e0",
+      "0x22dd31a495CafB229131A16C54a8e5b2f43C1162",
+      "0xE32132282D181967960928b77236B3c472d5f396",
+    ]
+    for (const [i, vault] of arbitrumVaults.entries()) {
+      await distributor.setGauge(vault, arbitrumGauges[i])
+    }
+
+  }
+
   before(async () => {
     const errorFactory = await ethers.getContractFactory("TestErrors")
     const errorsContract = await errorFactory.deploy()
-    console.log(errorsContract.interface.getError("0xfb8f41b2"));
+    console.log(errorsContract.interface.getError("0xe450d38c"));
     await deployments.fixture()
     controller = await ethers.getContractAt("IGaugeController", controllerAddress)
     vaults = await Promise.all(vaultAddresses.map(address => ethers.getContractAt("ERC20", address)))
@@ -46,7 +85,7 @@ describe("Gauge", function () {
     rewardToken1 = await ethers.getContractAt("ERC20", rewardToken1Address)
     rewardToken1Decimals = await rewardToken1.decimals()
 
-    distributor = await ethers.getContractAt("OrangeDistributor", (await deployments.get("OrangeDistributor")).address)
+    await deployTestDistributor()
     syk = await ethers.getContractAt("ERC20", await distributor.syk())
     xSyk = await ethers.getContractAt("ERC20", await distributor.xSyk())
     plsSyk = await ethers.getContractAt("ERC20", "0x68D6d2545f14751baF36c417c2CC7cdf8dA8a15b")
@@ -232,7 +271,7 @@ describe("Gauge", function () {
 
     it("Distributes syk and xSyk to users", async () => {
       for (const vault of vaultAddresses) {
-        const epoch0Reward = await distributor.epochRewards(vault, 0)
+        const epoch0Reward = await distributor.epochRewards(vault, 0) - parseEther("0.001")
 
         const epochData = {
           [s0.address]: {
@@ -255,26 +294,39 @@ describe("Gauge", function () {
             proofs: [],
             rewardAmount: epoch0Reward / 2n,
             balance: 1n
+          },
+          [s3.address]: {
+            user: s3.address,
+            rootId: 0,
+            proofs: [],
+            rewardAmount: parseEther("0.001"),
+            balance: 1n
           }
         }
         const {merkleTree, proofs} = createRootAndProofs(epochData)
     
+        const s3BalanceBeforeSyk = await syk.balanceOf(s3.address)
         await distributor.updateMerkleRoot(vault, await distributor.syk(), merkleTree.getHexRoot())
     
         await distributor.connect(s0).claim(vault, await distributor.syk(), epoch0Reward / 4n, proofs[s0.address])
         await distributor.connect(s1).claim(vault, await distributor.syk(), epoch0Reward / 4n, proofs[s1.address])
         await distributor.connect(s2).claim(vault, await distributor.syk(), epoch0Reward / 2n, proofs[s2.address])
+        await distributor.connect(s3).claim(vault, await distributor.syk(), parseEther("0.001"), proofs[s3.address])
         const s0BalanceAfterSyk = await syk.balanceOf(s0.address)
         const s0BalanceAfterxSyk = await plsSyk.balanceOf(s0.address)
         const s1BalanceAfterSyk = await syk.balanceOf(s1.address)
         const s1BalanceAfterxSyk = await plsSyk.balanceOf(s1.address)
         const s2BalanceAfterSyk = await syk.balanceOf(s2.address)
         const s2BalanceAfterxSyk = await plsSyk.balanceOf(s2.address)
+        const s3BalanceAfterSyk = await syk.balanceOf(s3.address)
+        const s3BalanceAfterxSyk = await plsSyk.balanceOf(s3.address)
 
         expect(s1BalanceAfterSyk).to.closeTo(s0BalanceAfterSyk, 1n)
         expect(s2BalanceAfterSyk).to.closeTo(s0BalanceAfterSyk * 2n, 1n)
         expect(s1BalanceAfterxSyk).to.closeTo(s0BalanceAfterxSyk, 1n)
         expect(s2BalanceAfterxSyk).to.closeTo(s0BalanceAfterxSyk * 2n, 1n)
+        expect(s3BalanceAfterSyk - s3BalanceBeforeSyk).to.equal(parseEther("0.001"))
+        expect(s3BalanceAfterxSyk).to.equal(0)
       }
       expect(await syk.balanceOf(distributor.getAddress())).to.lessThan(10n)
     })
@@ -302,41 +354,15 @@ describe("Gauge", function () {
 
   it("Rejects unauthorized transactions", async () => {
     const attacker = (await ethers.getSigners())[5]
-    await expect(distributor.initialize(ethers.ZeroAddress, ethers.ZeroAddress, ethers.ZeroAddress, [], [])).to.be.revertedWithCustomError(distributor, "InvalidInitialization")
     await expect(distributor.connect(attacker).setGauge(ethers.ZeroAddress, ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).skipPulls(ethers.ZeroAddress, 0)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).setKeeper(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).pullNext(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "Unauthorized")
+    await expect(distributor.connect(attacker).setSykDepositor(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
+    await expect(distributor.connect(attacker).setController(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).updateMerkleRoot(ethers.ZeroAddress, ethers.ZeroAddress, ethers.randomBytes(32))).to.be.revertedWithCustomError(distributor, "Unauthorized")
     await expect(distributor.connect(attacker).emergencyWithdrawal(ethers.ZeroAddress, 100n)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
+    await expect(distributor.connect(attacker).initialize(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "InvalidInitialization")
 
-    const {deploy} = deployments;
-    await expect(deploy("OrangeDistributor2", {
-      from: (await ethers.getSigners())[0].address,
-      contract: "OrangeDistributor",
-      proxy: {
-        execute: {
-          init: {
-            methodName: "initialize",
-            args: [
-              "0xFdf1B2c4E291b17f8E998e89cF28985fAF3cE6A1",
-              "0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25",
-              "0xd31583735e47206e9af728EF4f44f62B20db4b27",
-              [
-                "0x5f6D5a7e8eccA2A53C6322a96e9a48907A8284e0",
-              ],
-              [
-                "0x4927a62feFE180f9E6307Ef5cb34f94FcAd09227",
-                "0x97b1f6a13500de55B62b57B2D9e30Ca9E9bAB11B",
-                "0x61e9B42f28cdF30173c591b2eB38023ed969d437"
-              ]
-            ],
-          },
-        },
-        proxyContract: "OpenZeppelinTransparentProxy",
-      },
-      log: true,
-      autoMine: true,
-    })).to.be.revertedWithCustomError(distributor, "VaultGaugeArrayMismatch")
   })
 });
