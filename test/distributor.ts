@@ -364,5 +364,30 @@ describe("Gauge", function () {
     await expect(distributor.connect(attacker).emergencyWithdrawal(ethers.ZeroAddress, 100n)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).initialize(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "InvalidInitialization")
 
+    await expect(distributor.setController(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "ZeroAddressController")
+    await expect(distributor.setGauge(ethers.ZeroAddress, attacker.address)).to.be.revertedWithCustomError(distributor, "ZeroAddressVault")
+    await expect(distributor.setGauge(attacker.address, ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "ZeroAddressGauge")
+    await expect(distributor.setKeeper(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "ZeroAddressKeeper")
+    await expect(distributor.setSykDepositor(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "ZeroAddressSykDepositor")
+    await expect(distributor.updateMerkleRoot(ethers.ZeroAddress, syk.getAddress(), ethers.randomBytes(32))).to.be.revertedWithCustomError(distributor, "ZeroAddressVault")
+    await expect(distributor.updateMerkleRoot(syk.getAddress(), ethers.ZeroAddress, ethers.randomBytes(32))).to.be.revertedWithCustomError(distributor, "ZeroAddressToken")
+    const {deploy} = deployments;
+    await expect(deploy("TestOrangeDistributor3", {
+      from: (await ethers.getSigners())[0].address,
+      contract: "OrangeDistributor",
+      proxy: {
+        execute: {
+          init: {
+            methodName: "initialize",
+            args: [
+              ethers.ZeroAddress,
+            ],
+          },
+        },
+        proxyContract: "OpenZeppelinTransparentProxy",
+      },
+      log: true,
+      autoMine: true,
+    })).to.be.revertedWithCustomError(distributor, "ZeroAddressKeeper")
   })
 });

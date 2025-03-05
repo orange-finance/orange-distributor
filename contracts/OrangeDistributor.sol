@@ -31,6 +31,8 @@ contract OrangeDistributor is SYKPuller {
     event SetSykDepositor(address _previousDepositor, address _newDepositor);
 
     error InvalidProof();
+    error ZeroAddressSykDepositor();
+    error ZeroAddressToken();
 
     // Plutus depositor
     ISYKDepositor public sykDepositor;
@@ -46,6 +48,7 @@ contract OrangeDistributor is SYKPuller {
     }
 
     function setSykDepositor(ISYKDepositor _sykDepositor) external onlyOwner {
+        if (address(_sykDepositor)==address(0)) revert ZeroAddressSykDepositor();
         emit SetSykDepositor(address(sykDepositor), address(_sykDepositor));
         sykDepositor = _sykDepositor;
     }
@@ -101,6 +104,8 @@ contract OrangeDistributor is SYKPuller {
      * @param _merkleRoot New root for reward distribution
      */
     function updateMerkleRoot(address _vault, address _token, bytes32 _merkleRoot) external restricted {
+        if (_vault==address(0)) revert ZeroAddressVault();
+        if (_token==address(0)) revert ZeroAddressToken();
         merkleRoot[_vault][_token] = _merkleRoot;
         emit MerkleRootUpdated(_vault, _token, _merkleRoot);
     }

@@ -23,6 +23,10 @@ abstract contract SYKPuller is OwnableUpgradeable {
 
     error Unauthorized();
     error VaultGaugeArrayMismatch();
+    error ZeroAddressController();
+    error ZeroAddressGauge();
+    error ZeroAddressKeeper();
+    error ZeroAddressVault();
 
     // Mapping from vault to next reward epoch to pull
     mapping (address => uint) public nextStrykeEpochToPull;
@@ -44,6 +48,7 @@ abstract contract SYKPuller is OwnableUpgradeable {
 
     function __SYKPuller_init (address _keeper) internal initializer {
         __Ownable_init(msg.sender);
+        if (_keeper==address(0)) revert ZeroAddressKeeper();
         keeper = _keeper;
         emit SetKeeper(_keeper);
     }
@@ -61,6 +66,7 @@ abstract contract SYKPuller is OwnableUpgradeable {
     }
 
     function setController(IGaugeController _controller) external onlyOwner {
+        if (address(_controller)==address(0)) revert ZeroAddressController();
         emit SetController(address(controller), address(_controller));
         controller = _controller;
         syk = controller.syk();
@@ -73,6 +79,8 @@ abstract contract SYKPuller is OwnableUpgradeable {
      * pulling reward
      */
     function setGauge(address _vault, address _gauge) external onlyOwner {
+        if (_vault==address(0)) revert ZeroAddressVault();
+        if (_gauge==address(0)) revert ZeroAddressGauge();
         gauges[_vault] = _gauge;
         emit SetGauge(_vault, _gauge);
     }
@@ -81,6 +89,7 @@ abstract contract SYKPuller is OwnableUpgradeable {
      * @notice Update keeper address
      */
     function setKeeper(address _keeper) external onlyOwner {
+        if (_keeper==address(0)) revert ZeroAddressKeeper();
         keeper = _keeper;
         emit SetKeeper(_keeper);
     }
