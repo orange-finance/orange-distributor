@@ -1,3 +1,4 @@
+import { ethers } from 'hardhat';
 import {DeployFunction} from 'hardhat-deploy/types';
 
 const deployDistributor: DeployFunction = async function ({getNamedAccounts, deployments, network}) {
@@ -15,8 +16,9 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
     "0xe68161C93A241012ABcfcE8e3AB74Ad55a96b98f",
     "0x78F874b79C144139125a253fc8130d35BbB66825"
   ]
+  const sykDepositor = "0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25"
 
-  await deploy("OrangeDistributor", {
+  const deployment = await deploy("OrangeDistributor", {
     from: deployer,
     contract: "OrangeDistributor",
     proxy: {
@@ -24,11 +26,7 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
         init: {
           methodName: "initialize",
           args: [
-            arbitrumGaugeController,
-            "0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25",
-            "0xd31583735e47206e9af728EF4f44f62B20db4b27",
-            arbitrumVaults,
-            arbitrumGauges
+            "0xaE5d54837D88792Bed5bbc1a3665F7198176Bec6"
           ],
         },
       },
@@ -37,6 +35,22 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
     log: true,
     autoMine: true,
   });
+
+  const distributor = await ethers.getContractAt("OrangeDistributor", deployment.address, await ethers.getSigner(deployer))
+
+  // Note comment this if branch when testing, the new controller isn't deployed at the test block
+  if (arbitrumGaugeController!=ethers.ZeroAddress && await distributor.controller()!=arbitrumGaugeController) {
+    await distributor.setController(arbitrumGaugeController)
+  }
+  for (const [i, vault] of arbitrumVaults.entries()) {
+    if (await distributor.gauges(vault)!=arbitrumGauges[i]) {
+      await distributor.setGauge(vault, arbitrumGauges[i])
+    }
+  }
+  if (sykDepositor!=ethers.ZeroAddress && await distributor.sykDepositor()!=sykDepositor) {
+    await distributor.setSykDepositor(sykDepositor)
+  }
+  
 };
 
 module.exports = deployDistributor

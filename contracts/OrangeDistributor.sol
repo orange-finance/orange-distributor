@@ -3,12 +3,8 @@ pragma solidity ^0.8.27;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IGauge} from "./interfaces/IGauge.sol";
 import {ISYKDepositor} from "./interfaces/ISYKDepositor.sol";
-import {IGaugeController} from "./interfaces/IGaugeController.sol";
 import {SYKPuller} from "./SYKPuller.sol";
-import {IXStrykeToken} from "./interfaces/IXStrykeToken.sol";
 
 /**
  * @notice Contract for distributing token rewards to Orange vault
@@ -30,8 +26,11 @@ contract OrangeDistributor is SYKPuller {
 
     event MerkleRootUpdated(address indexed _vault, address indexed _token, bytes32 _newMerkleRoot);
     event RewardClaimed(address indexed _user, address indexed _vault, address indexed token, uint _amount);
+    event SetSykDepositor(address _previousDepositor, address _newDepositor);
 
     error InvalidProof();
+    error ZeroAddressSykDepositor();
+    error ZeroAddressToken();
 
     // Plutus depositor
     ISYKDepositor public sykDepositor;
@@ -42,8 +41,13 @@ contract OrangeDistributor is SYKPuller {
     // Mapping from vault to depositor to token to amount of token claimed
     mapping (address => mapping (address => mapping (address => uint))) public claimed;
 
-    function initialize(IGaugeController _controller, ISYKDepositor _sykDepositor, address _keeper, address[] memory _vaults, address[] memory _gauges) external initializer {
-        __SYKPuller_init(_controller, _keeper, _vaults, _gauges);
+    function initialize(address _keeper) external initializer {
+        __SYKPuller_init(_keeper);
+    }
+
+    function setSykDepositor(ISYKDepositor _sykDepositor) external onlyOwner {
+        if (address(_sykDepositor)==address(0)) revert ZeroAddressSykDepositor();
+        emit SetSykDepositor(address(sykDepositor), address(_sykDepositor));
         sykDepositor = _sykDepositor;
     }
 
@@ -61,10 +65,6 @@ contract OrangeDistributor is SYKPuller {
         require(MerkleProof.verifyCalldata(merkleProof, merkleRoot[_vault][_token], leaf), InvalidProof());
 
         if (_token==syk) {
-            // xSYK transfer
-            // IERC20(syk).safeIncreaseAllowance(xSyk, _amount/2);
-            // IXStrykeToken(xSyk).convert(_amount / 2, msg.sender);
-
             // plsSYK transfer
             uint plsSykAmount = _amount>2e16?_amount/2:0;
             uint sykAmount = _amount - plsSykAmount;
@@ -98,6 +98,8 @@ contract OrangeDistributor is SYKPuller {
      * @param _merkleRoot New root for reward distribution
      */
     function updateMerkleRoot(address _vault, address _token, bytes32 _merkleRoot) external restricted {
+        if (_vault==address(0)) revert ZeroAddressVault();
+        if (_token==address(0)) revert ZeroAddressToken();
         merkleRoot[_vault][_token] = _merkleRoot;
         emit MerkleRootUpdated(_vault, _token, _merkleRoot);
     }
