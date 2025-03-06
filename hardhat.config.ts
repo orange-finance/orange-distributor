@@ -6,6 +6,7 @@ import 'hardhat-deploy-ethers';
 import '@nomicfoundation/hardhat-chai-matchers';
 import '@typechain/hardhat';
 import 'solidity-coverage';
+import '@openzeppelin/hardhat-upgrades'
 import { ethers } from "ethers";
 require("dotenv").config();
 
