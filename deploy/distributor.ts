@@ -27,7 +27,7 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
   //   },
   // )
 
-  const deployment = await deploy("OrangeDistributor", {
+  const {address, newlyDeployed} = await deploy("OrangeDistributor", {
     from: deployer,
     contract: "OrangeDistributor",
     proxy: {
@@ -42,21 +42,16 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
       proxyContract: "UUPS",
     },
     log: true,
-    autoMine: true,
   });
 
-  const distributor = await ethers.getContractAt("OrangeDistributor", deployment.address, await ethers.getSigner(deployer))
+  const distributor = await ethers.getContractAt("OrangeDistributor", address, await ethers.getSigner(deployer))
 
-  // Note comment this if branch when testing, the new controller isn't deployed at the test block
-  if (arbitrumGaugeController!=ethers.ZeroAddress && await distributor.controller()!=arbitrumGaugeController) {
+  if (newlyDeployed) {
+    // Note comment setController when testing, the new controller isn't deployed at the test block
     await distributor.setController(arbitrumGaugeController)
-  }
-  for (const [i, vault] of arbitrumVaults.entries()) {
-    if (await distributor.gauges(vault)!=arbitrumGauges[i]) {
+    for (const [i, vault] of arbitrumVaults.entries()) {
       await distributor.setGauge(vault, arbitrumGauges[i])
     }
-  }
-  if (sykDepositor!=ethers.ZeroAddress && await distributor.sykDepositor()!=sykDepositor) {
     await distributor.setSykDepositor(sykDepositor)
   }
   
