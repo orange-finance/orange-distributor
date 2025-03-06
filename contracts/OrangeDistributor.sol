@@ -5,6 +5,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ISYKDepositor} from "./interfaces/ISYKDepositor.sol";
 import {SYKPuller} from "./SYKPuller.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /**
  * @notice Contract for distributing token rewards to Orange vault
@@ -21,7 +22,7 @@ import {SYKPuller} from "./SYKPuller.sol";
  * each vault depositor (this is performed off chain) and sent to the 
  * distributor contract via updateMerkleRoot
  */
-contract OrangeDistributor is SYKPuller {
+contract OrangeDistributor is UUPSUpgradeable, SYKPuller {
     using SafeERC20 for IERC20;
 
     event MerkleRootUpdated(address indexed _vault, address indexed _token, bytes32 _newMerkleRoot);
@@ -44,6 +45,8 @@ contract OrangeDistributor is SYKPuller {
     function initialize(address _keeper) external initializer {
         __SYKPuller_init(_keeper);
     }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function setSykDepositor(ISYKDepositor _sykDepositor) external onlyOwner {
         if (address(_sykDepositor)==address(0)) revert ZeroAddressSykDepositor();

@@ -1,7 +1,6 @@
-import { ethers } from 'hardhat';
 import {DeployFunction} from 'hardhat-deploy/types';
 
-const deployDistributor: DeployFunction = async function ({getNamedAccounts, deployments, network}) {
+const deployDistributor: DeployFunction = async function ({getNamedAccounts, deployments, network, upgrades, ethers}) {
   const {deploy} = deployments;
   const {deployer} = await getNamedAccounts();
 
@@ -18,6 +17,16 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
   ]
   const sykDepositor = "0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25"
 
+  // const existingDeployment = await deployments.get("OrangeDistributor")
+  // // check the new implementation is upgrade safe
+  // await upgrades.validateUpgrade(
+  //   existingDeployment.address,
+  //   await ethers.getContractFactory('OrangeDistributor'),
+  //   {
+  //     kind: 'uups',
+  //   },
+  // )
+
   const deployment = await deploy("OrangeDistributor", {
     from: deployer,
     contract: "OrangeDistributor",
@@ -30,7 +39,7 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
           ],
         },
       },
-      proxyContract: "OpenZeppelinTransparentProxy",
+      proxyContract: "UUPS",
     },
     log: true,
     autoMine: true,

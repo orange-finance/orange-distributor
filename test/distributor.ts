@@ -50,7 +50,7 @@ describe("Gauge", function () {
             ],
           },
         },
-        proxyContract: "OpenZeppelinTransparentProxy",
+        proxyContract: "UUPS",
       },
       log: true,
       autoMine: true,
@@ -75,9 +75,9 @@ describe("Gauge", function () {
   }
 
   before(async () => {
-    const errorFactory = await ethers.getContractFactory("TestErrors")
-    const errorsContract = await errorFactory.deploy()
-    console.log(errorsContract.interface.getError("0xe450d38c"));
+    // const errorFactory = await ethers.getContractFactory("TestErrors")
+    // const errorsContract = await errorFactory.deploy()
+    // console.log(errorsContract.interface.getError("0xe450d38c"));
     await deployments.fixture()
     controller = await ethers.getContractAt("IGaugeController", controllerAddress)
     vaults = await Promise.all(vaultAddresses.map(address => ethers.getContractAt("ERC20", address)))
@@ -384,7 +384,7 @@ describe("Gauge", function () {
             ],
           },
         },
-        proxyContract: "OpenZeppelinTransparentProxy",
+        proxyContract: "UUPS",
       },
       log: true,
       autoMine: true,
