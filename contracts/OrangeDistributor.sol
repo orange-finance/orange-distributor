@@ -6,6 +6,7 @@ import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeE
 import {ISYKDepositor} from "./interfaces/ISYKDepositor.sol";
 import {SYKPuller} from "./SYKPuller.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 /**
  * @notice Contract for distributing token rewards to Orange vault
@@ -22,7 +23,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
  * each vault depositor (this is performed off chain) and sent to the 
  * distributor contract via updateMerkleRoot
  */
-contract OrangeDistributor is UUPSUpgradeable, SYKPuller {
+contract OrangeDistributor is UUPSUpgradeable, PausableUpgradeable, SYKPuller {
     using SafeERC20 for IERC20;
 
     event MerkleRootUpdated(address indexed _vault, address indexed _token, bytes32 _newMerkleRoot);
@@ -41,6 +42,11 @@ contract OrangeDistributor is UUPSUpgradeable, SYKPuller {
 
     // Mapping from vault to depositor to token to amount of token claimed
     mapping (address => mapping (address => mapping (address => uint))) public claimed;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(address _keeper) external initializer {
         __SYKPuller_init(_keeper);
@@ -61,7 +67,7 @@ contract OrangeDistributor is UUPSUpgradeable, SYKPuller {
      * @param _amount Amount of token to claim as reward
      * @param merkleProof Merkle proof
      */
-    function claim(address _vault, address _token, uint256 _amount, bytes32[] calldata merkleProof) public {
+    function claim(address _vault, address _token, uint256 _amount, bytes32[] calldata merkleProof) public whenNotPaused {
         claimed[_vault][_token][msg.sender]+=_amount;
         
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender, claimed[_vault][_token][msg.sender]));
@@ -88,7 +94,7 @@ contract OrangeDistributor is UUPSUpgradeable, SYKPuller {
     /**
      * @notice Claim multiple token rewards in a single call
      */
-    function batchClaim(address[] calldata _vaults, address[] calldata _tokens, uint256[] calldata _amounts, bytes32[][] calldata merkleProofs) external {
+    function batchClaim(address[] calldata _vaults, address[] calldata _tokens, uint256[] calldata _amounts, bytes32[][] calldata merkleProofs) external whenNotPaused {
         for (uint i = 0; i<_vaults.length; i++) {
             claim(_vaults[i], _tokens[i], _amounts[i], merkleProofs[i]);
         }
@@ -105,6 +111,20 @@ contract OrangeDistributor is UUPSUpgradeable, SYKPuller {
         if (_token==address(0)) revert ZeroAddressToken();
         merkleRoot[_vault][_token] = _merkleRoot;
         emit MerkleRootUpdated(_vault, _token, _merkleRoot);
+    }
+
+    /**
+     * @notice Pause reward claims
+     */
+    function pause() external restricted {
+        _pause();
+    }
+    
+    /**
+     * @notice Unpause reward claims
+     */
+    function unpause() external restricted {
+        _unpause();
     }
 
     /**

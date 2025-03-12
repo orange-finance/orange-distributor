@@ -87,7 +87,6 @@ describe("Gauge", function () {
 
     await deployTestDistributor()
     syk = await ethers.getContractAt("ERC20", await distributor.syk())
-    xSyk = await ethers.getContractAt("ERC20", await distributor.xSyk())
     plsSyk = await ethers.getContractAt("ERC20", "0x68D6d2545f14751baF36c417c2CC7cdf8dA8a15b")
 
     await addTokenBalance(rewardToken1Address, ethers.parseUnits("100000000", rewardToken1Decimals), await distributor.getAddress())
@@ -236,18 +235,18 @@ describe("Gauge", function () {
       }
 
       // Whitelist distributor for xSYK
-      const xSYK = await ethers.getContractAt("IXStrykeToken", await distributor.xSyk())
-      const authorityAddress = "0xf885390B75035e94ac72AeF3E0D0eD5ec3b85d37"
-      await network.provider.request({
-        method: "hardhat_impersonateAccount",
-        params: [authorityAddress],
-      });
-      const authority = await ethers.getSigner(authorityAddress)
-      await network.provider.send("hardhat_setBalance", [
-        authorityAddress,
-        "0x10000000000000000000000000000000",
-      ]);
-      await xSYK.connect(authority).updateContractWhitelist(distributor.getAddress(), true)
+      // const xSYK = await ethers.getContractAt("IXStrykeToken", await distributor.xSyk())
+      // const authorityAddress = "0xf885390B75035e94ac72AeF3E0D0eD5ec3b85d37"
+      // await network.provider.request({
+      //   method: "hardhat_impersonateAccount",
+      //   params: [authorityAddress],
+      // });
+      // const authority = await ethers.getSigner(authorityAddress)
+      // await network.provider.send("hardhat_setBalance", [
+      //   authorityAddress,
+      //   "0x10000000000000000000000000000000",
+      // ]);
+      // await xSYK.connect(authority).updateContractWhitelist(distributor.getAddress(), true)
 
     })
 
@@ -389,5 +388,10 @@ describe("Gauge", function () {
       log: true,
       autoMine: true,
     })).to.be.revertedWithCustomError(distributor, "ZeroAddressKeeper")
+
+    await distributor.pause()
+    await expect(distributor.claim(ethers.ZeroAddress, ethers.ZeroAddress, 1n, [])).to.be.revertedWithCustomError(distributor, "EnforcedPause")
+    await expect(distributor.batchClaim([], [], [], [])).to.be.revertedWithCustomError(distributor, "EnforcedPause")
+    await distributor.unpause()
   })
 });
