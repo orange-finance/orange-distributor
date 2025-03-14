@@ -29,10 +29,13 @@ contract OrangeDistributor is UUPSUpgradeable, PausableUpgradeable, SYKPuller {
     event MerkleRootUpdated(address indexed _vault, address indexed _token, bytes32 _newMerkleRoot);
     event RewardClaimed(address indexed _user, address indexed _vault, address indexed token, uint _amount);
     event SetSykDepositor(address _previousDepositor, address _newDepositor);
+    event SetPauser(address indexed _pauser);
 
     error InvalidProof();
     error ZeroAddressSykDepositor();
     error ZeroAddressToken();
+    error ZeroAddressPauser();
+    error NotPauser();
 
     // Plutus depositor
     ISYKDepositor public sykDepositor;
@@ -43,16 +46,38 @@ contract OrangeDistributor is UUPSUpgradeable, PausableUpgradeable, SYKPuller {
     // Mapping from vault to depositor to token to amount of token claimed
     mapping (address => mapping (address => mapping (address => uint))) public claimed;
 
+    address public pauser;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address _keeper) external initializer {
+    function initialize(address _keeper, address _pauser) external initializer {
         __SYKPuller_init(_keeper);
+        if (_pauser==address(0)) revert ZeroAddressPauser();
+        pauser = _pauser;
+        emit SetPauser(pauser);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    /**
+     * @notice Modifier to restrict access to only pauser and owner
+     */
+    modifier onlyPausers() {
+        if (msg.sender!=pauser && msg.sender!=owner()) revert NotPauser();
+        _;
+    }
+
+    /**
+     * @notice Set pauser address
+     */
+    function setPauser(address _pauser) external onlyOwner {
+        if (_pauser==address(0)) revert ZeroAddressPauser();
+        pauser = _pauser;
+        emit SetPauser(pauser);
+    }
 
     function setSykDepositor(ISYKDepositor _sykDepositor) external onlyOwner {
         if (address(_sykDepositor)==address(0)) revert ZeroAddressSykDepositor();
@@ -116,14 +141,14 @@ contract OrangeDistributor is UUPSUpgradeable, PausableUpgradeable, SYKPuller {
     /**
      * @notice Pause reward claims
      */
-    function pause() external restricted {
+    function pause() external onlyPausers {
         _pause();
     }
     
     /**
      * @notice Unpause reward claims
      */
-    function unpause() external restricted {
+    function unpause() external onlyPausers {
         _unpause();
     }
 

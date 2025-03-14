@@ -47,6 +47,7 @@ describe("Gauge", function () {
             methodName: "initialize",
             args: [
               "0xd31583735e47206e9af728EF4f44f62B20db4b27",
+              "0xd31583735e47206e9af728EF4f44f62B20db4b27",
             ],
           },
         },
@@ -351,22 +352,31 @@ describe("Gauge", function () {
     expect(await distributor.keeper()).to.equal((await ethers.getSigners())[3])
   })
 
+  it("Updates keeper", async () => {
+    await distributor.setPauser((await ethers.getSigners())[4])
+    expect(await distributor.pauser()).to.equal((await ethers.getSigners())[4])
+  })
+
   it("Rejects unauthorized transactions", async () => {
     const attacker = (await ethers.getSigners())[5]
     await expect(distributor.connect(attacker).setGauge(ethers.ZeroAddress, ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).skipPulls(ethers.ZeroAddress, 0)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).setKeeper(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
+    await expect(distributor.connect(attacker).setPauser(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).pullNext(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "Unauthorized")
     await expect(distributor.connect(attacker).setSykDepositor(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).setController(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
     await expect(distributor.connect(attacker).updateMerkleRoot(ethers.ZeroAddress, ethers.ZeroAddress, ethers.randomBytes(32))).to.be.revertedWithCustomError(distributor, "Unauthorized")
     await expect(distributor.connect(attacker).emergencyWithdrawal(ethers.ZeroAddress, 100n)).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount")
-    await expect(distributor.connect(attacker).initialize(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "InvalidInitialization")
+    await expect(distributor.connect(attacker).initialize(ethers.ZeroAddress, ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "InvalidInitialization")
+    await expect(distributor.connect(attacker).pause()).to.be.revertedWithCustomError(distributor, "NotPauser")
+    await expect(distributor.connect(attacker).unpause()).to.be.revertedWithCustomError(distributor, "NotPauser")
 
     await expect(distributor.setController(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "ZeroAddressController")
     await expect(distributor.setGauge(ethers.ZeroAddress, attacker.address)).to.be.revertedWithCustomError(distributor, "ZeroAddressVault")
     await expect(distributor.setGauge(attacker.address, ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "ZeroAddressGauge")
     await expect(distributor.setKeeper(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "ZeroAddressKeeper")
+    await expect(distributor.setPauser(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "ZeroAddressPauser")
     await expect(distributor.setSykDepositor(ethers.ZeroAddress)).to.be.revertedWithCustomError(distributor, "ZeroAddressSykDepositor")
     await expect(distributor.updateMerkleRoot(ethers.ZeroAddress, syk.getAddress(), ethers.randomBytes(32))).to.be.revertedWithCustomError(distributor, "ZeroAddressVault")
     await expect(distributor.updateMerkleRoot(syk.getAddress(), ethers.ZeroAddress, ethers.randomBytes(32))).to.be.revertedWithCustomError(distributor, "ZeroAddressToken")
@@ -380,6 +390,7 @@ describe("Gauge", function () {
             methodName: "initialize",
             args: [
               ethers.ZeroAddress,
+              ethers.ZeroAddress,
             ],
           },
         },
@@ -388,10 +399,28 @@ describe("Gauge", function () {
       log: true,
       autoMine: true,
     })).to.be.revertedWithCustomError(distributor, "ZeroAddressKeeper")
+    await expect(deploy("TestOrangeDistributor3", {
+      from: (await ethers.getSigners())[0].address,
+      contract: "OrangeDistributor",
+      proxy: {
+        execute: {
+          init: {
+            methodName: "initialize",
+            args: [
+              await rewardToken1.getAddress(),
+              ethers.ZeroAddress,
+            ],
+          },
+        },
+        proxyContract: "UUPS",
+      },
+      log: true,
+      autoMine: true,
+    })).to.be.revertedWithCustomError(distributor, "ZeroAddressPauser")
 
-    await distributor.pause()
+    await distributor.connect((await ethers.getSigners())[4]).pause()
     await expect(distributor.claim(ethers.ZeroAddress, ethers.ZeroAddress, 1n, [])).to.be.revertedWithCustomError(distributor, "EnforcedPause")
     await expect(distributor.batchClaim([], [], [], [])).to.be.revertedWithCustomError(distributor, "EnforcedPause")
-    await distributor.unpause()
+    await distributor.connect((await ethers.getSigners())[4]).unpause()
   })
 });
