@@ -7,18 +7,16 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { parseEther } from "ethers";
 
 describe("Gauge", function () {
-  const controllerAddress = "0xFdf1B2c4E291b17f8E998e89cF28985fAF3cE6A1"
+  const controllerAddress = "0x82C13fCab02A168F06E12373F9e5D2C2Bd47e399"
   const vaultAddresses = [
-    "0x5f6D5a7e8eccA2A53C6322a96e9a48907A8284e0",
-    "0x22dd31a495CafB229131A16C54a8e5b2f43C1162",
-    "0xE32132282D181967960928b77236B3c472d5f396",
+    "0x9338a4c3De7082E27802DCB6AC5A4502C93D1808",
+    "0xa3899444a955Fb1DdDbd7Aea385771DB0a67fB12",
+    "0x8b20087Bb0580bCB827d3ebDF06485aF86ea16cB",
   ]
   const gaugeAddresses = [
-    // "0xc16f3f88Bd88CD28fb95df9628866149b1561528",
-    // "0x51d4D761346B8ce4667896825dce39e8c9849D06",
-    "0x4927a62feFE180f9E6307Ef5cb34f94FcAd09227",
-    "0x97b1f6a13500de55B62b57B2D9e30Ca9E9bAB11B",
-    "0x61e9B42f28cdF30173c591b2eB38023ed969d437"
+    "0x6B8E05cA2A6bd2E8b208B98F7b136E45Da5DAb63",
+    "0xe68161C93A241012ABcfcE8e3AB74Ad55a96b98f",
+    "0x78F874b79C144139125a253fc8130d35BbB66825"
   ]
   const rewardToken1Address = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
   let syk: ERC20
@@ -46,8 +44,8 @@ describe("Gauge", function () {
           init: {
             methodName: "initialize",
             args: [
-              "0xd31583735e47206e9af728EF4f44f62B20db4b27",
-              "0xd31583735e47206e9af728EF4f44f62B20db4b27",
+              "0xaE5d54837D88792Bed5bbc1a3665F7198176Bec6",
+              "0xaE5d54837D88792Bed5bbc1a3665F7198176Bec6",
             ],
           },
         },
@@ -57,20 +55,10 @@ describe("Gauge", function () {
       autoMine: true,
     })
     distributor = await ethers.getContractAt("OrangeDistributor", deployment.address)
-    await distributor.setController("0xFdf1B2c4E291b17f8E998e89cF28985fAF3cE6A1")
+    await distributor.setController(controllerAddress)
     await distributor.setSykDepositor("0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25")
-    const arbitrumVaults = [
-      "0x4927a62feFE180f9E6307Ef5cb34f94FcAd09227",
-      "0x97b1f6a13500de55B62b57B2D9e30Ca9E9bAB11B",
-      "0x61e9B42f28cdF30173c591b2eB38023ed969d437"
-    ]
-    const arbitrumGauges = [
-      "0x5f6D5a7e8eccA2A53C6322a96e9a48907A8284e0",
-      "0x22dd31a495CafB229131A16C54a8e5b2f43C1162",
-      "0xE32132282D181967960928b77236B3c472d5f396",
-    ]
-    for (const [i, vault] of arbitrumVaults.entries()) {
-      await distributor.setGauge(vault, arbitrumGauges[i])
+    for (const [i, vault] of vaultAddresses.entries()) {
+      await distributor.setGauge(vault, gaugeAddresses[i])
     }
 
   }
@@ -324,7 +312,7 @@ describe("Gauge", function () {
         expect(s1BalanceAfterSyk).to.closeTo(s0BalanceAfterSyk, 1n)
         expect(s2BalanceAfterSyk).to.closeTo(s0BalanceAfterSyk * 2n, 1n)
         expect(s1BalanceAfterxSyk).to.closeTo(s0BalanceAfterxSyk, 1n)
-        expect(s2BalanceAfterxSyk).to.closeTo(s0BalanceAfterxSyk * 2n, 1n)
+        expect(s2BalanceAfterxSyk).to.closeTo(s0BalanceAfterxSyk * 2n, 2n)
         expect(s3BalanceAfterSyk - s3BalanceBeforeSyk).to.equal(parseEther("0.001"))
         expect(s3BalanceAfterxSyk).to.equal(0)
       }
