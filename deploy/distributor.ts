@@ -1,6 +1,6 @@
 import {DeployFunction} from 'hardhat-deploy/types';
 
-const deployDistributor: DeployFunction = async function ({getNamedAccounts, deployments, network, upgrades, ethers}) {
+const deployDistributor: DeployFunction = async function ({getNamedAccounts, deployments, network, upgrades, ethers, getChainId}) {
   const {deploy} = deployments;
   const {deployer} = await getNamedAccounts();
 
@@ -47,7 +47,7 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
 
   const distributor = await ethers.getContractAt("OrangeDistributor", address, await ethers.getSigner(deployer))
 
-  if (newlyDeployed) {
+  if (newlyDeployed && await getChainId()==="42161") {
     // Note comment setController when testing, the new controller isn't deployed at the test block
     await distributor.setController(arbitrumGaugeController)
     for (const [i, vault] of arbitrumVaults.entries()) {

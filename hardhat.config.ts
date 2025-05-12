@@ -35,6 +35,16 @@ const config: HardhatUserConfig = {
         }
       },
     },
+    bera: {
+      url: process.env.BERACHAIN_RPC,
+      accounts: [process.env.PRIVATE_KEY!],
+      verify: {
+        etherscan: {
+          apiUrl: 'https://api.berascan.com',
+          apiKey: process.env.BERASCAN_KEY!
+        }
+      },
+    },
     arbitrumSepolia: {
       url: 'https://sepolia-rollup.arbitrum.io/rpc',
       accounts: [process.env.PRIVATE_KEY!],
