@@ -1,6 +1,6 @@
 import {DeployFunction} from 'hardhat-deploy/types';
 
-const deployDistributor: DeployFunction = async function ({getNamedAccounts, deployments, network}) {
+const deployDistributor: DeployFunction = async function ({getNamedAccounts, deployments, network, upgrades, ethers}) {
   const {deploy} = deployments;
   const {deployer} = await getNamedAccounts();
 
@@ -15,8 +15,19 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
     "0xe68161C93A241012ABcfcE8e3AB74Ad55a96b98f",
     "0x78F874b79C144139125a253fc8130d35BbB66825"
   ]
+  const sykDepositor = "0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25"
 
-  await deploy("OrangeDistributor", {
+  // const existingDeployment = await deployments.get("OrangeDistributor")
+  // // check the new implementation is upgrade safe
+  // await upgrades.validateUpgrade(
+  //   existingDeployment.address,
+  //   await ethers.getContractFactory('OrangeDistributor'),
+  //   {
+  //     kind: 'uups',
+  //   },
+  // )
+
+  const {address, newlyDeployed} = await deploy("OrangeDistributor", {
     from: deployer,
     contract: "OrangeDistributor",
     proxy: {
@@ -24,19 +35,27 @@ const deployDistributor: DeployFunction = async function ({getNamedAccounts, dep
         init: {
           methodName: "initialize",
           args: [
-            arbitrumGaugeController,
-            "0x2eD0837D9f2fBB927011463FaD0736F86Ea6bF25",
-            "0xd31583735e47206e9af728EF4f44f62B20db4b27",
-            arbitrumVaults,
-            arbitrumGauges
+            "0xaE5d54837D88792Bed5bbc1a3665F7198176Bec6",
+            "0xaE5d54837D88792Bed5bbc1a3665F7198176Bec6"
           ],
         },
       },
-      proxyContract: "OpenZeppelinTransparentProxy",
+      proxyContract: "UUPS",
     },
     log: true,
-    autoMine: true,
   });
+
+  const distributor = await ethers.getContractAt("OrangeDistributor", address, await ethers.getSigner(deployer))
+
+  if (newlyDeployed) {
+    // Note comment setController when testing, the new controller isn't deployed at the test block
+    await distributor.setController(arbitrumGaugeController)
+    for (const [i, vault] of arbitrumVaults.entries()) {
+      await distributor.setGauge(vault, arbitrumGauges[i])
+    }
+    await distributor.setSykDepositor(sykDepositor)
+  }
+  
 };
 
 module.exports = deployDistributor

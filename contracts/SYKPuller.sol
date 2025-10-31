@@ -5,7 +5,6 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IGauge} from "./interfaces/IGauge.sol";
 import {IGaugeController} from "./interfaces/IGaugeController.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /**
  * @notice Abstract contract with logic for pulling rewards
@@ -20,9 +19,14 @@ abstract contract SYKPuller is OwnableUpgradeable {
     event RewardPulled(address indexed _vault, uint _amount);
     event SkipPulls(address indexed _vault, uint _nextEpochToPull);
     event SetKeeper(address indexed _keeper);
+    event SetController(address _previousController, address _newController);
 
     error Unauthorized();
     error VaultGaugeArrayMismatch();
+    error ZeroAddressController();
+    error ZeroAddressGauge();
+    error ZeroAddressKeeper();
+    error ZeroAddressVault();
 
     // Mapping from vault to next reward epoch to pull
     mapping (address => uint) public nextStrykeEpochToPull;
@@ -38,23 +42,13 @@ abstract contract SYKPuller is OwnableUpgradeable {
 
     address public keeper;
 
-    // Stryke tokens
+    // Stryke token
     address public syk;
-    address public xSyk;
 
-    function __SYKPuller_init (IGaugeController _controller, address _keeper, address[] memory _vaults, address[] memory _gauges) internal initializer {
+    function __SYKPuller_init (address _keeper) internal onlyInitializing {
         __Ownable_init(msg.sender);
-        controller = _controller;
-        syk = controller.syk();
-        xSyk = controller.xSyk();
+        if (_keeper==address(0)) revert ZeroAddressKeeper();
         keeper = _keeper;
-
-        require(_vaults.length==_gauges.length, VaultGaugeArrayMismatch());
-        for (uint i = 0; i<_vaults.length; i++) {
-            gauges[_vaults[i]] = _gauges[i];
-            emit SetGauge(_vaults[i], _gauges[i]);
-        }
-
         emit SetKeeper(_keeper);
     }
 
@@ -70,12 +64,21 @@ abstract contract SYKPuller is OwnableUpgradeable {
         return controller.epochFinalized(nextStrykeEpochToPull[_vault]);
     }
 
+    function setController(IGaugeController _controller) external onlyOwner {
+        if (address(_controller)==address(0)) revert ZeroAddressController();
+        emit SetController(address(controller), address(_controller));
+        controller = _controller;
+        syk = controller.syk();
+    }
+
     /**
      * @notice Set the gauge for an orange vault
      * @dev SYKPuller needs to be made the owner of the gauge, to allow
      * pulling reward
      */
     function setGauge(address _vault, address _gauge) external onlyOwner {
+        if (_vault==address(0)) revert ZeroAddressVault();
+        if (_gauge==address(0)) revert ZeroAddressGauge();
         gauges[_vault] = _gauge;
         emit SetGauge(_vault, _gauge);
     }
@@ -84,6 +87,7 @@ abstract contract SYKPuller is OwnableUpgradeable {
      * @notice Update keeper address
      */
     function setKeeper(address _keeper) external onlyOwner {
+        if (_keeper==address(0)) revert ZeroAddressKeeper();
         keeper = _keeper;
         emit SetKeeper(_keeper);
     }

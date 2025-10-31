@@ -3,12 +3,10 @@ pragma solidity ^0.8.27;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IGauge} from "./interfaces/IGauge.sol";
 import {ISYKDepositor} from "./interfaces/ISYKDepositor.sol";
-import {IGaugeController} from "./interfaces/IGaugeController.sol";
 import {SYKPuller} from "./SYKPuller.sol";
-import {IXStrykeToken} from "./interfaces/IXStrykeToken.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 /**
  * @notice Contract for distributing token rewards to Orange vault
@@ -25,13 +23,19 @@ import {IXStrykeToken} from "./interfaces/IXStrykeToken.sol";
  * each vault depositor (this is performed off chain) and sent to the 
  * distributor contract via updateMerkleRoot
  */
-contract OrangeDistributor is SYKPuller {
+contract OrangeDistributor is UUPSUpgradeable, PausableUpgradeable, SYKPuller {
     using SafeERC20 for IERC20;
 
     event MerkleRootUpdated(address indexed _vault, address indexed _token, bytes32 _newMerkleRoot);
     event RewardClaimed(address indexed _user, address indexed _vault, address indexed token, uint _amount);
+    event SetSykDepositor(address _previousDepositor, address _newDepositor);
+    event SetPauser(address indexed _pauser);
 
     error InvalidProof();
+    error ZeroAddressSykDepositor();
+    error ZeroAddressToken();
+    error ZeroAddressPauser();
+    error NotPauser();
 
     // Plutus depositor
     ISYKDepositor public sykDepositor;
@@ -42,8 +46,42 @@ contract OrangeDistributor is SYKPuller {
     // Mapping from vault to depositor to token to amount of token claimed
     mapping (address => mapping (address => mapping (address => uint))) public claimed;
 
-    function initialize(IGaugeController _controller, ISYKDepositor _sykDepositor, address _keeper, address[] memory _vaults, address[] memory _gauges) external initializer {
-        __SYKPuller_init(_controller, _keeper, _vaults, _gauges);
+    address public pauser;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _keeper, address _pauser) external initializer {
+        __SYKPuller_init(_keeper);
+        if (_pauser==address(0)) revert ZeroAddressPauser();
+        pauser = _pauser;
+        emit SetPauser(pauser);
+    }
+
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    /**
+     * @notice Modifier to restrict access to only pauser and owner
+     */
+    modifier onlyPausers() {
+        if (msg.sender!=pauser && msg.sender!=owner()) revert NotPauser();
+        _;
+    }
+
+    /**
+     * @notice Set pauser address
+     */
+    function setPauser(address _pauser) external onlyOwner {
+        if (_pauser==address(0)) revert ZeroAddressPauser();
+        pauser = _pauser;
+        emit SetPauser(pauser);
+    }
+
+    function setSykDepositor(ISYKDepositor _sykDepositor) external onlyOwner {
+        if (address(_sykDepositor)==address(0)) revert ZeroAddressSykDepositor();
+        emit SetSykDepositor(address(sykDepositor), address(_sykDepositor));
         sykDepositor = _sykDepositor;
     }
 
@@ -54,17 +92,13 @@ contract OrangeDistributor is SYKPuller {
      * @param _amount Amount of token to claim as reward
      * @param merkleProof Merkle proof
      */
-    function claim(address _vault, address _token, uint256 _amount, bytes32[] calldata merkleProof) public {
+    function claim(address _vault, address _token, uint256 _amount, bytes32[] calldata merkleProof) public whenNotPaused {
         claimed[_vault][_token][msg.sender]+=_amount;
         
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender, claimed[_vault][_token][msg.sender]));
         require(MerkleProof.verifyCalldata(merkleProof, merkleRoot[_vault][_token], leaf), InvalidProof());
 
         if (_token==syk) {
-            // xSYK transfer
-            // IERC20(syk).safeIncreaseAllowance(xSyk, _amount/2);
-            // IXStrykeToken(xSyk).convert(_amount / 2, msg.sender);
-
             // plsSYK transfer
             uint plsSykAmount = _amount>2e16?_amount/2:0;
             uint sykAmount = _amount - plsSykAmount;
@@ -85,7 +119,7 @@ contract OrangeDistributor is SYKPuller {
     /**
      * @notice Claim multiple token rewards in a single call
      */
-    function batchClaim(address[] calldata _vaults, address[] calldata _tokens, uint256[] calldata _amounts, bytes32[][] calldata merkleProofs) external {
+    function batchClaim(address[] calldata _vaults, address[] calldata _tokens, uint256[] calldata _amounts, bytes32[][] calldata merkleProofs) external whenNotPaused {
         for (uint i = 0; i<_vaults.length; i++) {
             claim(_vaults[i], _tokens[i], _amounts[i], merkleProofs[i]);
         }
@@ -98,8 +132,24 @@ contract OrangeDistributor is SYKPuller {
      * @param _merkleRoot New root for reward distribution
      */
     function updateMerkleRoot(address _vault, address _token, bytes32 _merkleRoot) external restricted {
+        if (_vault==address(0)) revert ZeroAddressVault();
+        if (_token==address(0)) revert ZeroAddressToken();
         merkleRoot[_vault][_token] = _merkleRoot;
         emit MerkleRootUpdated(_vault, _token, _merkleRoot);
+    }
+
+    /**
+     * @notice Pause reward claims
+     */
+    function pause() external onlyPausers {
+        _pause();
+    }
+    
+    /**
+     * @notice Unpause reward claims
+     */
+    function unpause() external onlyPausers {
+        _unpause();
     }
 
     /**

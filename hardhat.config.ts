@@ -6,6 +6,7 @@ import 'hardhat-deploy-ethers';
 import '@nomicfoundation/hardhat-chai-matchers';
 import '@typechain/hardhat';
 import 'solidity-coverage';
+import '@openzeppelin/hardhat-upgrades'
 import { ethers } from "ethers";
 require("dotenv").config();
 
@@ -18,7 +19,7 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: {
         url: process.env.ARBITRUM_RPC!,
-        blockNumber: 263802613
+        blockNumber: 312295890
       },
     },
     localhost: {
