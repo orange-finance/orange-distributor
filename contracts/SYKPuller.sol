@@ -42,11 +42,10 @@ abstract contract SYKPuller is OwnableUpgradeable {
 
     address public keeper;
 
-    // Stryke tokens
+    // Stryke token
     address public syk;
-    address public xSyk;
 
-    function __SYKPuller_init (address _keeper) internal initializer {
+    function __SYKPuller_init (address _keeper) internal onlyInitializing {
         __Ownable_init(msg.sender);
         if (_keeper==address(0)) revert ZeroAddressKeeper();
         keeper = _keeper;
@@ -70,7 +69,6 @@ abstract contract SYKPuller is OwnableUpgradeable {
         emit SetController(address(controller), address(_controller));
         controller = _controller;
         syk = controller.syk();
-        xSyk = controller.xSyk();
     }
 
     /**
